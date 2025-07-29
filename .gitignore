@@ -1,0 +1,64 @@
+# Build Outputs
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.docstates
+
+# MSI Installer Outputs
+Installer/
+MSI_Output/
+MSI_Framework/
+*Setup/Debug/
+*Setup/Release/
+*.msi
+*.exe
+*.cab
+
+# Visual Studio
+.vs/
+*.sln.docstates
+*.userprefs
+
+# JetBrains IDEs
+.idea/
+
+# Qodo
+.qodo/
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# NuGet
+packages/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# .NET Core
+project.assets.json
+project.nuget.cache
+*.nuget.props
+*.nuget.targets
+
+# MSBuild Binary and Structured Log
+*.binlog
+
+# Visual Studio Code
+.vscode/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db

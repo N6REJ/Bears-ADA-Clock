@@ -1,0 +1,169 @@
+<Window x:Class="BearsAdaClock.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Bears ADA Clock Settings" 
+        Height="650" 
+        Width="500"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        AutomationProperties.Name="Bears ADA Clock Settings Window">
+    
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
+        <StackPanel>
+            <TextBlock Text="Bears ADA Clock Settings" 
+                       FontSize="24" 
+                       FontWeight="Bold" 
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,20"
+                       AutomationProperties.Name="Settings Window Title"/>
+            
+            <!-- Digit Size Settings -->
+            <GroupBox Header="Time Display Settings" Padding="10" AutomationProperties.Name="Time Display Settings Group" Margin="0,0,0,15">
+                <StackPanel>
+                    <Label Content="Digit Size:" Target="{Binding ElementName=DigitSizeSlider}" AutomationProperties.Name="Digit Size Label" Margin="0,0,0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Slider x:Name="DigitSizeSlider" 
+                                Minimum="36" 
+                                Maximum="128" 
+                                TickFrequency="8" 
+                                IsSnapToTickEnabled="True"
+                                Width="300"
+                                Value="24"
+                                ValueChanged="DigitSizeSlider_ValueChanged"
+                                AutomationProperties.Name="Digit Size Slider - Range 36 to 128 pixels in 8 pixel increments"/>
+                        <TextBlock x:Name="DigitSizeValue" Text="24px" Width="50" VerticalAlignment="Center" Margin="10,0,0,0" AutomationProperties.Name="Current Digit Size Value"/>
+                    </StackPanel>
+                    
+                    <Label Content="Digit Color:" Target="{Binding ElementName=DigitColorCombo}" AutomationProperties.Name="Digit Color Label" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="DigitColorCombo" 
+                              Width="200" 
+                              HorizontalAlignment="Left"
+                              SelectionChanged="DigitColorCombo_SelectionChanged"
+                              AutomationProperties.Name="Digit Color Selection"
+                              Margin="0,0,0,10">
+                        <ComboBoxItem Content="Black" Tag="Black" IsSelected="True"/>
+                        <ComboBoxItem Content="White" Tag="White"/>
+                        <ComboBoxItem Content="Red" Tag="Red"/>
+                        <ComboBoxItem Content="Blue" Tag="Blue"/>
+                        <ComboBoxItem Content="Green" Tag="Green"/>
+                        <ComboBoxItem Content="Yellow" Tag="Yellow"/>
+                        <ComboBoxItem Content="Orange" Tag="Orange"/>
+                        <ComboBoxItem Content="Purple" Tag="Purple"/>
+                        <ComboBoxItem Content="Gray" Tag="Gray"/>
+                    </ComboBox>
+                    
+                    <CheckBox x:Name="ShowSecondsCheckBox" 
+                              Content="Show Seconds" 
+                              IsChecked="False"
+                              Checked="ShowSecondsCheckBox_Changed"
+                              Unchecked="ShowSecondsCheckBox_Changed"
+                              AutomationProperties.Name="Show Seconds Checkbox - Toggle display of seconds in time"/>
+                </StackPanel>
+            </GroupBox>
+            
+            <!-- Date Size Settings -->
+            <GroupBox Header="Date Display Settings" Padding="10" AutomationProperties.Name="Date Display Settings Group" Margin="0,0,0,15">
+                <StackPanel>
+                    <Label Content="Date Size:" Target="{Binding ElementName=DateSizeSlider}" AutomationProperties.Name="Date Size Label" Margin="0,0,0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Slider x:Name="DateSizeSlider" 
+                                Minimum="36" 
+                                Maximum="128" 
+                                TickFrequency="8" 
+                                IsSnapToTickEnabled="True"
+                                Width="300"
+                                Value="24"
+                                ValueChanged="DateSizeSlider_ValueChanged"
+                                AutomationProperties.Name="Date Size Slider - Range 36 to 128 pixels in 8 pixel increments"/>
+                        <TextBlock x:Name="DateSizeValue" Text="24px" Width="50" VerticalAlignment="Center" Margin="10,0,0,0" AutomationProperties.Name="Current Date Size Value"/>
+                    </StackPanel>
+                    
+                    <Label Content="Date Color:" Target="{Binding ElementName=DateColorCombo}" AutomationProperties.Name="Date Color Label" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="DateColorCombo" 
+                              Width="200" 
+                              HorizontalAlignment="Left"
+                              SelectionChanged="DateColorCombo_SelectionChanged"
+                              AutomationProperties.Name="Date Color Selection"
+                              Margin="0,0,0,10">
+                        <ComboBoxItem Content="Black" Tag="Black" IsSelected="True"/>
+                        <ComboBoxItem Content="White" Tag="White"/>
+                        <ComboBoxItem Content="Red" Tag="Red"/>
+                        <ComboBoxItem Content="Blue" Tag="Blue"/>
+                        <ComboBoxItem Content="Green" Tag="Green"/>
+                        <ComboBoxItem Content="Yellow" Tag="Yellow"/>
+                        <ComboBoxItem Content="Orange" Tag="Orange"/>
+                        <ComboBoxItem Content="Purple" Tag="Purple"/>
+                        <ComboBoxItem Content="Gray" Tag="Gray"/>
+                    </ComboBox>
+                    
+                    <Label Content="Date Format:" Target="{Binding ElementName=DateFormatCombo}" AutomationProperties.Name="Date Format Label" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="DateFormatCombo" 
+                              Width="200" 
+                              HorizontalAlignment="Left"
+                              SelectionChanged="DateFormatCombo_SelectionChanged"
+                              AutomationProperties.Name="Date Format Selection"
+                              Margin="0,0,0,10">
+                        <ComboBoxItem Content="YYYY MMM DD" Tag="yyyy MMM dd" IsSelected="True"/>
+                        <ComboBoxItem Content="MMM DD, YYYY" Tag="MMM dd, yyyy"/>
+                        <ComboBoxItem Content="DD MMM YYYY" Tag="dd MMM yyyy"/>
+                    </ComboBox>
+                </StackPanel>
+            </GroupBox>
+            
+            <!-- Display Mode Settings -->
+            <GroupBox Header="Display Mode" Padding="10" AutomationProperties.Name="Display Mode Settings Group" Margin="0,0,0,15">
+                <StackPanel>
+                    <Label Content="What to Display:" Target="{Binding ElementName=DisplayModeCombo}" AutomationProperties.Name="Display Mode Label" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="DisplayModeCombo" 
+                              Width="200" 
+                              HorizontalAlignment="Left"
+                              SelectionChanged="DisplayModeCombo_SelectionChanged"
+                              AutomationProperties.Name="Display Mode Selection">
+                        <ComboBoxItem Content="Time and Date" Tag="Both" IsSelected="True"/>
+                        <ComboBoxItem Content="Date Above Time" Tag="DateAbove"/>
+                        <ComboBoxItem Content="Time Only" Tag="TimeOnly"/>
+                        <ComboBoxItem Content="Date Only" Tag="DateOnly"/>
+                    </ComboBox>
+                </StackPanel>
+            </GroupBox>
+            
+            <!-- Preview Section -->
+            <GroupBox Header="Preview" Padding="10" AutomationProperties.Name="Settings Preview Group" Margin="0,0,0,15">
+                <Border Background="White" BorderBrush="Gray" BorderThickness="1" Padding="20">
+                    <StackPanel x:Name="PreviewPanel" HorizontalAlignment="Center">
+                        <TextBlock x:Name="PreviewTime" 
+                                   Text="12:34" 
+                                   FontFamily="{StaticResource ClockFont}"
+                                   FontSize="24" 
+                                   Foreground="Black"
+                                   HorizontalAlignment="Center"
+                                   AutomationProperties.Name="Time Preview"/>
+                        <TextBlock x:Name="PreviewDate" 
+                                   Text="2024 Jan 15" 
+                                   FontFamily="{StaticResource ClockFont}"
+                                   FontSize="24" 
+                                   Foreground="Black"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,5,0,0"
+                                   AutomationProperties.Name="Date Preview"/>
+                    </StackPanel>
+                </Border>
+            </GroupBox>
+            
+            <!-- Action Buttons -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                <Button Content="Apply" 
+                        Width="100" 
+                        Height="35" 
+                        Click="Apply_Click"
+                        AutomationProperties.Name="Apply Settings Button"/>
+                <Button Content="Close" 
+                        Width="100" 
+                        Height="35" 
+                        Click="Close_Click"
+                        Margin="20,0,0,0"
+                        AutomationProperties.Name="Close Settings Window Button"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>
