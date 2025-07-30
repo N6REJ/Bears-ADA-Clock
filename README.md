@@ -16,13 +16,16 @@ A desktop clock specifically designed for those with accessibility issues, featu
 - **Date Display**: Configurable date format with multiple options
 - **Custom Font**: Uses Roboto Mono TTF font for clear, readable digits
 - **Draggable**: Click and drag to move the clock anywhere on your desktop
+- **Right-Click Context Menu**: Access settings and exit options anywhere on the clock
+- **Responsive Window**: Automatically sizes to content - no wasted space or oversized click areas
 - **Normal Window Behavior**: Integrates naturally with other windows (not always on top)
-- **Transparent Background**: Minimal visual footprint
+- **Transparent Background**: Completely transparent with no visible borders or frames
+- **Auto-Start**: Automatically starts with Windows (configurable)
 
 ### Customization Options
 - **Font Size Control**: 
-  - Separate sliders for time and date (36px to 128px in 8px increments)
-  - Default size: 24px for both time and date
+  - Separate sliders for time and date (24px to 128px in 8px increments)
+  - Default sizes: 56px for time, 32px for date (optimized for accessibility)
   - Real-time preview of changes
 - **Time Display Options**:
   - Toggle seconds display on/off (default: off)
@@ -34,7 +37,16 @@ A desktop clock specifically designed for those with accessibility issues, featu
   - YYYY MMM DD (default)
   - MMM DD, YYYY
   - DD MMM YYYY
-- **Positioning**: Default upper-right placement (64px from edges)
+- **Display Modes**:
+  - Time and Date (default)
+  - Date Above Time
+  - Time Only
+  - Date Only
+- **Startup Options**:
+  - Start with Windows (enabled by default)
+  - Automatic startup configuration
+- **Responsive Window**: Automatically sizes to content for optimal right-click area
+- **Positioning**: Default upper-right placement (64px from edges), maintains position after font changes
 
 ## System Requirements
 
@@ -114,22 +126,34 @@ A desktop clock specifically designed for those with accessibility issues, featu
 The settings window provides comprehensive customization:
 
 1. **Time Display Settings**:
-   - Adjust digit size with the slider (36-128px)
+   - Adjust digit size with the slider (24-128px)
    - Select color from the dropdown menu
    - Toggle seconds display on/off with checkbox
    - See real-time preview of changes
 
 2. **Date Display Settings**:
-   - Adjust date size independently from time
+   - Adjust date size independently from time (24-128px)
    - Choose date color (can be different from time color)
    - Select preferred date format
 
-3. **Preview Section**:
+3. **Display Mode Settings**:
+   - Choose what to display: Time and Date, Date Above Time, Time Only, or Date Only
+   - Perfect for different use cases and screen space requirements
+
+4. **Startup Options**:
+   - Toggle "Start with Windows" to automatically launch the clock at login
+   - Enabled by default for convenience
+   - Automatically configures Windows startup registry entries
+
+5. **Preview Section**:
    - See exactly how your settings will look
    - Updates in real-time as you make changes
+   - Shows actual font sizes and colors
 
-4. **Apply Changes**:
+6. **Apply Changes**:
    - Click "Apply" to save and implement your settings
+   - Window automatically resizes to fit new content
+   - Position is maintained relative to screen edges
    - Click "Close" to exit without saving changes
 
 ### Accessibility Usage

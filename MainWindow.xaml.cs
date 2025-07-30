@@ -1,10 +1,13 @@
 using System;
+using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Globalization;
 using System.Windows.Automation;
+using Microsoft.Win32;
 
 namespace BearsAdaClock
 {
@@ -14,8 +17,8 @@ namespace BearsAdaClock
         private SettingsWindow settingsWindow;
         
         // Settings properties
-        public double DigitSize { get; set; } = 24;
-        public double DateSize { get; set; } = 24;
+        public double DigitSize { get; set; } = 56;
+        public double DateSize { get; set; } = 32;
         public Brush DigitColor { get; set; } = Brushes.Black;
         public Brush DateColor { get; set; } = Brushes.Black;
         public string DateFormat { get; set; } = "yyyy MMM dd";
@@ -28,6 +31,9 @@ namespace BearsAdaClock
             InitializeTimer();
             PositionWindow();
             UpdateDisplay();
+            
+            // Enable startup by default on first run
+            InitializeStartupSetting();
         }
 
         private void InitializeTimer()
@@ -41,9 +47,12 @@ namespace BearsAdaClock
         private void PositionWindow()
         {
             // Position window 64px from top and right edges
-            var workingArea = SystemParameters.WorkArea;
-            this.Left = workingArea.Right - this.Width - 64;
-            this.Top = workingArea.Top + 64;
+            // Since we're using SizeToContent, we need to wait for the window to be loaded
+            this.Loaded += (s, e) => {
+                var workingArea = SystemParameters.WorkArea;
+                this.Left = workingArea.Right - this.ActualWidth - 64;
+                this.Top = workingArea.Top + 64;
+            };
         }
 
         private void Timer_Tick(object sender, EventArgs e)
@@ -168,6 +177,18 @@ namespace BearsAdaClock
             }
         }
 
+        private void Window_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            // Show context menu on right-click anywhere on the window
+            ClockContextMenu.IsOpen = true;
+        }
+
+        private void Grid_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            // Show context menu on right-click anywhere in the grid (entire window area)
+            ClockContextMenu.IsOpen = true;
+        }
+
         private void Settings_Click(object sender, RoutedEventArgs e)
         {
             if (settingsWindow == null || !settingsWindow.IsLoaded)
@@ -188,6 +209,93 @@ namespace BearsAdaClock
         public void ApplySettings()
         {
             UpdateDisplay();
+            
+            // Reposition window after settings change since size might have changed
+            this.Dispatcher.BeginInvoke(new Action(() => {
+                var workingArea = SystemParameters.WorkArea;
+                this.Left = workingArea.Right - this.ActualWidth - 64;
+                this.Top = workingArea.Top + 64;
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
+
+        #region Startup Management
+
+        private void InitializeStartupSetting()
+        {
+            try
+            {
+                // Check if this is the first run by looking for a registry marker
+                bool isFirstRun = IsFirstRun();
+                
+                if (isFirstRun)
+                {
+                    // Enable startup by default on first run
+                    EnableStartup();
+                    
+                    // Mark that the app has been run before
+                    MarkAsRun();
+                }
+            }
+            catch
+            {
+                // Silently fail if we can't access registry
+                // The user can still manually enable startup in settings
+            }
+        }
+
+        private bool IsFirstRun()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\N6REJ\BearsAdaClock", false))
+                {
+                    return key?.GetValue("HasRun") == null;
+                }
+            }
+            catch
+            {
+                return true; // Assume first run if we can't check
+            }
+        }
+
+        private void MarkAsRun()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\N6REJ\BearsAdaClock"))
+                {
+                    key?.SetValue("HasRun", "true");
+                }
+            }
+            catch
+            {
+                // Silently fail
+            }
+        }
+
+        private void EnableStartup()
+        {
+            try
+            {
+                string executablePath = Assembly.GetExecutingAssembly().Location;
+                
+                // For .NET 6+, we need to get the actual executable path
+                if (executablePath.EndsWith(".dll"))
+                {
+                    executablePath = Path.ChangeExtension(executablePath, ".exe");
+                }
+
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
+                }
+            }
+            catch
+            {
+                // Silently fail - user can enable manually in settings
+            }
+        }
+
+        #endregion
     }
 }

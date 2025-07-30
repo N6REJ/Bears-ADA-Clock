@@ -2,10 +2,12 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Bears ADA Clock Settings" 
-        Height="650" 
-        Width="500"
+        Height="1100" 
+        Width="600"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
+        ResizeMode="CanResize"
+        MinHeight="1100"
+        MinWidth="600"
         AutomationProperties.Name="Bears ADA Clock Settings Window">
     
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
@@ -23,14 +25,14 @@
                     <Label Content="Digit Size:" Target="{Binding ElementName=DigitSizeSlider}" AutomationProperties.Name="Digit Size Label" Margin="0,0,0,5"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <Slider x:Name="DigitSizeSlider" 
-                                Minimum="36" 
+                                Minimum="24" 
                                 Maximum="128" 
                                 TickFrequency="8" 
                                 IsSnapToTickEnabled="True"
                                 Width="300"
                                 Value="24"
                                 ValueChanged="DigitSizeSlider_ValueChanged"
-                                AutomationProperties.Name="Digit Size Slider - Range 36 to 128 pixels in 8 pixel increments"/>
+                                AutomationProperties.Name="Digit Size Slider - Range 24 to 128 pixels in 8 pixel increments"/>
                         <TextBlock x:Name="DigitSizeValue" Text="24px" Width="50" VerticalAlignment="Center" Margin="10,0,0,0" AutomationProperties.Name="Current Digit Size Value"/>
                     </StackPanel>
                     
@@ -67,14 +69,14 @@
                     <Label Content="Date Size:" Target="{Binding ElementName=DateSizeSlider}" AutomationProperties.Name="Date Size Label" Margin="0,0,0,5"/>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                         <Slider x:Name="DateSizeSlider" 
-                                Minimum="36" 
+                                Minimum="24" 
                                 Maximum="128" 
                                 TickFrequency="8" 
                                 IsSnapToTickEnabled="True"
                                 Width="300"
                                 Value="24"
                                 ValueChanged="DateSizeSlider_ValueChanged"
-                                AutomationProperties.Name="Date Size Slider - Range 36 to 128 pixels in 8 pixel increments"/>
+                                AutomationProperties.Name="Date Size Slider - Range 24 to 128 pixels in 8 pixel increments"/>
                         <TextBlock x:Name="DateSizeValue" Text="24px" Width="50" VerticalAlignment="Center" Margin="10,0,0,0" AutomationProperties.Name="Current Date Size Value"/>
                     </StackPanel>
                     
@@ -124,6 +126,24 @@
                         <ComboBoxItem Content="Time Only" Tag="TimeOnly"/>
                         <ComboBoxItem Content="Date Only" Tag="DateOnly"/>
                     </ComboBox>
+                </StackPanel>
+            </GroupBox>
+            
+            <!-- Startup Settings -->
+            <GroupBox Header="Startup Options" Padding="10" AutomationProperties.Name="Startup Options Group" Margin="0,0,0,15">
+                <StackPanel>
+                    <CheckBox x:Name="StartWithWindowsCheckBox" 
+                              Content="Start with Windows" 
+                              IsChecked="True"
+                              Checked="StartWithWindowsCheckBox_Changed"
+                              Unchecked="StartWithWindowsCheckBox_Changed"
+                              AutomationProperties.Name="Start with Windows Checkbox - Automatically start Bears ADA Clock when Windows starts"/>
+                    <TextBlock Text="When enabled, Bears ADA Clock will automatically start when you log into Windows." 
+                               FontSize="11" 
+                               Foreground="Gray" 
+                               Margin="20,5,0,0" 
+                               TextWrapping="Wrap"
+                               AutomationProperties.Name="Startup option description"/>
                 </StackPanel>
             </GroupBox>
             

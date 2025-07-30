@@ -1,8 +1,11 @@
 using System;
+using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Automation;
+using Microsoft.Win32;
 
 namespace BearsAdaClock
 {
@@ -34,6 +37,9 @@ namespace BearsAdaClock
             
             // Set display mode selection
             SetDisplayModeSelection(mainWindow.DisplayMode);
+            
+            // Load startup setting
+            StartWithWindowsCheckBox.IsChecked = IsStartupEnabled();
             
             // Update value displays
             DigitSizeValue.Text = $"{mainWindow.DigitSize:F0}px";
@@ -298,9 +304,9 @@ namespace BearsAdaClock
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
             // Validate display mode to ensure at least one element is visible
-            if (DisplayModeCombo.SelectedItem is ComboBoxItem modeItem)
+            if (DisplayModeCombo.SelectedItem is ComboBoxItem validationModeItem)
             {
-                string selectedMode = modeItem.Tag.ToString();
+                string selectedMode = validationModeItem.Tag.ToString();
                 
                 if (!IsValidDisplayMode(selectedMode))
                 {
@@ -336,9 +342,9 @@ namespace BearsAdaClock
                 mainWindow.DateFormat = formatItem.Tag.ToString();
             }
 
-            if (DisplayModeCombo.SelectedItem is ComboBoxItem modeItem)
+            if (DisplayModeCombo.SelectedItem is ComboBoxItem applyModeItem)
             {
-                mainWindow.DisplayMode = modeItem.Tag.ToString();
+                mainWindow.DisplayMode = applyModeItem.Tag.ToString();
             }
 
             mainWindow.ApplySettings();
@@ -358,5 +364,94 @@ namespace BearsAdaClock
             // Ensure the settings window can be reopened
             mainWindow.Focus();
         }
+
+        #region Startup Management
+
+        private void StartWithWindowsCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            bool isChecked = StartWithWindowsCheckBox.IsChecked == true;
+            
+            try
+            {
+                if (isChecked)
+                {
+                    EnableStartup();
+                }
+                else
+                {
+                    DisableStartup();
+                }
+                
+                // Announce change to screen readers
+                AutomationProperties.SetName(StartWithWindowsCheckBox, 
+                    $"Start with Windows Checkbox - Currently {(isChecked ? "enabled" : "disabled")}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to update startup setting: {ex.Message}", 
+                              "Startup Setting Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                
+                // Revert checkbox state on error
+                StartWithWindowsCheckBox.IsChecked = !isChecked;
+            }
+        }
+
+        private bool IsStartupEnabled()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
+                {
+                    return key?.GetValue("BearsAdaClock") != null;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void EnableStartup()
+        {
+            try
+            {
+                string executablePath = Assembly.GetExecutingAssembly().Location;
+                
+                // For .NET 6+, we need to get the actual executable path
+                if (executablePath.EndsWith(".dll"))
+                {
+                    executablePath = Path.ChangeExtension(executablePath, ".exe");
+                }
+
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Unable to add to startup: {ex.Message}");
+            }
+        }
+
+        private void DisableStartup()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    if (key?.GetValue("BearsAdaClock") != null)
+                    {
+                        key.DeleteValue("BearsAdaClock");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Unable to remove from startup: {ex.Message}");
+            }
+        }
+
+        #endregion
     }
 }

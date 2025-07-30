@@ -25,10 +25,36 @@
     <RepositoryUrl>https://github.com/N6REJ/Bears-ADA-Clock</RepositoryUrl>
     <PackageTags>accessibility;clock;desktop;ada;screen-reader</PackageTags>
     <PackageSupportUrl>https://github.com/N6REJ/Bears-ADA-Clock/issues</PackageSupportUrl>
+    <ApplicationIcon>icons\clock.ico</ApplicationIcon>
+    <Title>Bears ADA Clock</Title>
+    <Description>Accessibilty focused desktop clock</Description>
+    <PackageIcon>clock.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>License.rtf</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
     <Resource Include="Fonts\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="icons\clock.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="icons\clock.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="License.rtf">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
