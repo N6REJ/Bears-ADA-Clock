@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net6.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyTitle>Bears ADA Clock</AssemblyTitle>
     <AssemblyDescription>Desktop clock specifically designed for those with accessibility issues</AssemblyDescription>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>

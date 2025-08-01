@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using System.Globalization;
 using System.Windows.Automation;
 using Microsoft.Win32;
+using BearsAdaClock.Properties;
 
 namespace BearsAdaClock
 {
@@ -28,12 +29,91 @@ namespace BearsAdaClock
         public MainWindow()
         {
             InitializeComponent();
+            LoadSettings();
             InitializeTimer();
             PositionWindow();
             UpdateDisplay();
             
             // Enable startup by default on first run
             InitializeStartupSetting();
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                // Load settings from user settings
+                DigitSize = Settings.Default.DigitSize;
+                DateSize = Settings.Default.DateSize;
+                DigitColor = GetBrushFromName(Settings.Default.DigitColor);
+                DateColor = GetBrushFromName(Settings.Default.DateColor);
+                DateFormat = Settings.Default.DateFormat;
+                DisplayMode = Settings.Default.DisplayMode;
+                ShowSeconds = Settings.Default.ShowSeconds;
+                
+                // Load window position if saved
+                if (Settings.Default.WindowLeft >= 0 && Settings.Default.WindowTop >= 0)
+                {
+                    this.Left = Settings.Default.WindowLeft;
+                    this.Top = Settings.Default.WindowTop;
+                }
+            }
+            catch
+            {
+                // Use defaults if settings can't be loaded
+            }
+        }
+
+        public void SaveSettings()
+        {
+            try
+            {
+                Settings.Default.DigitSize = DigitSize;
+                Settings.Default.DateSize = DateSize;
+                Settings.Default.DigitColor = GetColorName(DigitColor);
+                Settings.Default.DateColor = GetColorName(DateColor);
+                Settings.Default.DateFormat = DateFormat;
+                Settings.Default.DisplayMode = DisplayMode;
+                Settings.Default.ShowSeconds = ShowSeconds;
+                Settings.Default.WindowLeft = this.Left;
+                Settings.Default.WindowTop = this.Top;
+                Settings.Default.Save();
+            }
+            catch
+            {
+                // Silently fail if settings can't be saved
+            }
+        }
+
+        private Brush GetBrushFromName(string colorName)
+        {
+            switch (colorName)
+            {
+                case "Black": return Brushes.Black;
+                case "White": return Brushes.White;
+                case "Red": return Brushes.Red;
+                case "Blue": return Brushes.Blue;
+                case "Green": return Brushes.Green;
+                case "Yellow": return Brushes.Yellow;
+                case "Orange": return Brushes.Orange;
+                case "Purple": return Brushes.Purple;
+                case "Gray": return Brushes.Gray;
+                default: return Brushes.Black;
+            }
+        }
+
+        private string GetColorName(Brush brush)
+        {
+            if (brush == Brushes.Black) return "Black";
+            if (brush == Brushes.White) return "White";
+            if (brush == Brushes.Red) return "Red";
+            if (brush == Brushes.Blue) return "Blue";
+            if (brush == Brushes.Green) return "Green";
+            if (brush == Brushes.Yellow) return "Yellow";
+            if (brush == Brushes.Orange) return "Orange";
+            if (brush == Brushes.Purple) return "Purple";
+            if (brush == Brushes.Gray) return "Gray";
+            return "Black";
         }
 
         private void InitializeTimer()
@@ -49,9 +129,13 @@ namespace BearsAdaClock
             // Position window 64px from top and right edges
             // Since we're using SizeToContent, we need to wait for the window to be loaded
             this.Loaded += (s, e) => {
-                var workingArea = SystemParameters.WorkArea;
-                this.Left = workingArea.Right - this.ActualWidth - 64;
-                this.Top = workingArea.Top + 64;
+                // Only auto-position if no saved position exists
+                if (Settings.Default.WindowLeft < 0 || Settings.Default.WindowTop < 0)
+                {
+                    var workingArea = SystemParameters.WorkArea;
+                    this.Left = workingArea.Right - this.ActualWidth - 64;
+                    this.Top = workingArea.Top + 64;
+                }
             };
         }
 
@@ -174,6 +258,8 @@ namespace BearsAdaClock
             if (e.ButtonState == MouseButtonState.Pressed)
             {
                 this.DragMove();
+                // Save position after dragging
+                SaveSettings();
             }
         }
 
@@ -203,12 +289,14 @@ namespace BearsAdaClock
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
+            SaveSettings();
             Application.Current.Shutdown();
         }
 
         public void ApplySettings()
         {
             UpdateDisplay();
+            SaveSettings(); // Save settings when applied
             
             // Reposition window after settings change since size might have changed
             this.Dispatcher.BeginInvoke(new Action(() => {
@@ -216,6 +304,12 @@ namespace BearsAdaClock
                 this.Left = workingArea.Right - this.ActualWidth - 64;
                 this.Top = workingArea.Top + 64;
             }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            SaveSettings();
+            base.OnClosed(e);
         }
 
         #region Startup Management
@@ -277,13 +371,7 @@ namespace BearsAdaClock
         {
             try
             {
-                string executablePath = Assembly.GetExecutingAssembly().Location;
-                
-                // For .NET 6+, we need to get the actual executable path
-                if (executablePath.EndsWith(".dll"))
-                {
-                    executablePath = Path.ChangeExtension(executablePath, ".exe");
-                }
+                string executablePath = GetExecutablePath();
 
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
                 {
@@ -294,6 +382,32 @@ namespace BearsAdaClock
             {
                 // Silently fail - user can enable manually in settings
             }
+        }
+
+        private string GetExecutablePath()
+        {
+            // Get the current process executable path
+            string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+            
+            // If it's a .dll (development), try to find the .exe
+            if (processPath.EndsWith(".dll"))
+            {
+                string exePath = Path.ChangeExtension(processPath, ".exe");
+                if (File.Exists(exePath))
+                {
+                    return exePath;
+                }
+                
+                // Fallback to assembly location
+                string assemblyPath = Assembly.GetExecutingAssembly().Location;
+                if (assemblyPath.EndsWith(".dll"))
+                {
+                    assemblyPath = Path.ChangeExtension(assemblyPath, ".exe");
+                }
+                return assemblyPath;
+            }
+            
+            return processPath;
         }
 
         #endregion

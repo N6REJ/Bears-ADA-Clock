@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Automation;
 using Microsoft.Win32;
+using BearsAdaClock.Properties;
 
 namespace BearsAdaClock
 {
@@ -415,18 +416,16 @@ namespace BearsAdaClock
         {
             try
             {
-                string executablePath = Assembly.GetExecutingAssembly().Location;
-                
-                // For .NET 6+, we need to get the actual executable path
-                if (executablePath.EndsWith(".dll"))
-                {
-                    executablePath = Path.ChangeExtension(executablePath, ".exe");
-                }
+                string executablePath = GetExecutablePath();
 
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
                 {
                     key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
                 }
+                
+                // Save startup setting
+                Settings.Default.StartWithWindows = true;
+                Settings.Default.Save();
             }
             catch (Exception ex)
             {
@@ -445,11 +444,41 @@ namespace BearsAdaClock
                         key.DeleteValue("BearsAdaClock");
                     }
                 }
+                
+                // Save startup setting
+                Settings.Default.StartWithWindows = false;
+                Settings.Default.Save();
             }
             catch (Exception ex)
             {
                 throw new Exception($"Unable to remove from startup: {ex.Message}");
             }
+        }
+
+        private string GetExecutablePath()
+        {
+            // Get the current process executable path
+            string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+            
+            // If it's a .dll (development), try to find the .exe
+            if (processPath.EndsWith(".dll"))
+            {
+                string exePath = Path.ChangeExtension(processPath, ".exe");
+                if (File.Exists(exePath))
+                {
+                    return exePath;
+                }
+                
+                // Fallback to assembly location
+                string assemblyPath = Assembly.GetExecutingAssembly().Location;
+                if (assemblyPath.EndsWith(".dll"))
+                {
+                    assemblyPath = Path.ChangeExtension(assemblyPath, ".exe");
+                }
+                return assemblyPath;
+            }
+            
+            return processPath;
         }
 
         #endregion
