@@ -1,3 +1,8 @@
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/N6REJ/Bears-ADA-Clock)
+![GitHub top language](https://img.shields.io/github/languages/top/N6REJ/Bears-ADA-Clock)
+![GitHub All Releases](https://img.shields.io/github/downloads/N6REJ/Bears-ADA-Clock/total)
+![License: GPL v3](https://img.shields.io/badge/License-MIT-blue.svg)
+
 # Bears ADA Clock
 
 A desktop clock specifically designed for those with accessibility issues, featuring full screen reader support and comprehensive customization options.
