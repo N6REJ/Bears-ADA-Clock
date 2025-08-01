@@ -17,14 +17,15 @@
     <Window.ContextMenu>
         <ContextMenu x:Name="ClockContextMenu" AutomationProperties.Name="Clock Settings Menu">
             <MenuItem Header="Settings" Click="Settings_Click" AutomationProperties.Name="Open Settings"/>
+            <MenuItem Header="Show Settings Folder" Click="ShowSettingsFolder_Click" AutomationProperties.Name="Show Settings Folder"/>
             <Separator/>
             <MenuItem Header="Exit" Click="Exit_Click" AutomationProperties.Name="Exit Application"/>
         </ContextMenu>
     </Window.ContextMenu>
     
     <Grid Background="#01000000" MouseRightButtonUp="Grid_MouseRightButtonUp">
-        <StackPanel x:Name="ClockPanel" Margin="2" AutomationProperties.Name="Clock Display"
-                    HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel x:Name="ClockPanel" Margin="0" AutomationProperties.Name="Clock Display"
+                    HorizontalAlignment="Center" VerticalAlignment="Top">
             <TextBlock x:Name="TimeDisplay" 
                        Text="00:00" 
                        FontFamily="{StaticResource ClockFont}"

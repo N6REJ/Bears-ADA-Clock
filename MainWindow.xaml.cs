@@ -16,8 +16,6 @@ namespace BearsAdaClock
     {
         private DispatcherTimer timer;
         private SettingsWindow settingsWindow;
-        
-        // Settings properties
         public double DigitSize { get; set; } = 56;
         public double DateSize { get; set; } = 32;
         public Brush DigitColor { get; set; } = Brushes.Black;
@@ -31,18 +29,20 @@ namespace BearsAdaClock
             InitializeComponent();
             LoadSettings();
             InitializeTimer();
-            PositionWindow();
             UpdateDisplay();
-            
-            // Enable startup by default on first run
+            this.Loaded += MainWindow_Loaded;
             InitializeStartupSetting();
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            PositionWindow();
         }
 
         private void LoadSettings()
         {
             try
             {
-                // Load settings from user settings
                 DigitSize = Settings.Default.DigitSize;
                 DateSize = Settings.Default.DateSize;
                 DigitColor = GetBrushFromName(Settings.Default.DigitColor);
@@ -50,17 +50,10 @@ namespace BearsAdaClock
                 DateFormat = Settings.Default.DateFormat;
                 DisplayMode = Settings.Default.DisplayMode;
                 ShowSeconds = Settings.Default.ShowSeconds;
-                
-                // Load window position if saved
-                if (Settings.Default.WindowLeft >= 0 && Settings.Default.WindowTop >= 0)
-                {
-                    this.Left = Settings.Default.WindowLeft;
-                    this.Top = Settings.Default.WindowTop;
-                }
             }
-            catch
+            catch (Exception ex)
             {
-                // Use defaults if settings can't be loaded
+                MessageBox.Show($"Failed to load settings: {ex.Message}", "Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -79,9 +72,9 @@ namespace BearsAdaClock
                 Settings.Default.WindowTop = this.Top;
                 Settings.Default.Save();
             }
-            catch
+            catch (Exception ex)
             {
-                // Silently fail if settings can't be saved
+                MessageBox.Show($"Failed to save settings: {ex.Message}", "Settings Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -126,17 +119,29 @@ namespace BearsAdaClock
 
         private void PositionWindow()
         {
-            // Position window 64px from top and right edges
-            // Since we're using SizeToContent, we need to wait for the window to be loaded
-            this.Loaded += (s, e) => {
-                // Only auto-position if no saved position exists
-                if (Settings.Default.WindowLeft < 0 || Settings.Default.WindowTop < 0)
+            try
+            {
+                var workingArea = SystemParameters.WorkArea;
+                if (Settings.Default.WindowLeft >= 0 && Settings.Default.WindowTop >= 0)
                 {
-                    var workingArea = SystemParameters.WorkArea;
-                    this.Left = workingArea.Right - this.ActualWidth - 64;
-                    this.Top = workingArea.Top + 64;
+                    if (Settings.Default.WindowLeft >= workingArea.Left &&
+                        Settings.Default.WindowLeft < workingArea.Right - 100 &&
+                        Settings.Default.WindowTop >= workingArea.Top &&
+                        Settings.Default.WindowTop < workingArea.Bottom - 50)
+                    {
+                        this.Left = Settings.Default.WindowLeft;
+                        this.Top = Settings.Default.WindowTop;
+                        return;
+                    }
                 }
-            };
+                this.Left = workingArea.Right - this.ActualWidth - 64;
+                this.Top = workingArea.Top + 64;
+                SaveSettings();
+            }
+            catch
+            {
+                this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
         }
 
         private void Timer_Tick(object sender, EventArgs e)
@@ -147,54 +152,32 @@ namespace BearsAdaClock
         private void UpdateDisplay()
         {
             var now = DateTime.Now;
-            
-            // Update time display with or without seconds
             string timeFormat = ShowSeconds ? "HH:mm:ss" : "HH:mm";
             TimeDisplay.Text = now.ToString(timeFormat);
             TimeDisplay.FontSize = DigitSize;
             TimeDisplay.Foreground = DigitColor;
-            
-            // Update date display
             DateDisplay.Text = FormatDate(now, DateFormat);
             DateDisplay.FontSize = DateSize;
             DateDisplay.Foreground = DateColor;
-            
-            // Update display mode and visibility
             UpdateDisplayMode();
-            
-            // Update automation properties for screen readers
             string timeAnnouncement = ShowSeconds ? now.ToString("h:mm:ss tt") : now.ToString("h:mm tt");
-            
             if (DisplayMode != "DateOnly")
-            {
                 AutomationProperties.SetName(TimeDisplay, $"Current time is {timeAnnouncement}");
-            }
-            
             if (DisplayMode != "TimeOnly")
-            {
                 AutomationProperties.SetName(DateDisplay, $"Current date is {FormatDate(now, DateFormat)}");
-            }
         }
 
-        /// <summary>
-        /// Updates the display mode ensuring at least one element (time or date) is always visible.
-        /// This prevents the clock from being completely empty.
-        /// </summary>
         private void UpdateDisplayMode()
         {
-            // Clear the panel and re-add elements in the correct order
             ClockPanel.Children.Clear();
-
-            // Safety check: Ensure we never have an empty display
             string safeDisplayMode = DisplayMode;
-            if (string.IsNullOrEmpty(safeDisplayMode) || 
-                (safeDisplayMode != "Both" && safeDisplayMode != "DateAbove" && 
+            if (string.IsNullOrEmpty(safeDisplayMode) ||
+                (safeDisplayMode != "Both" && safeDisplayMode != "DateAbove" &&
                  safeDisplayMode != "TimeOnly" && safeDisplayMode != "DateOnly"))
             {
-                safeDisplayMode = "Both"; // Safe default that always shows something
-                DisplayMode = "Both"; // Update the property to the safe value
+                safeDisplayMode = "Both";
+                DisplayMode = "Both";
             }
-
             switch (safeDisplayMode)
             {
                 case "Both":
@@ -226,7 +209,6 @@ namespace BearsAdaClock
                     DateDisplay.Margin = new Thickness(0, 0, 0, 0);
                     break;
                 default:
-                    // Additional safety fallback (should never reach here due to validation above)
                     ClockPanel.Children.Add(TimeDisplay);
                     ClockPanel.Children.Add(DateDisplay);
                     TimeDisplay.Visibility = Visibility.Visible;
@@ -242,49 +224,57 @@ namespace BearsAdaClock
         {
             switch (format)
             {
-                case "MMM dd, yyyy":
-                    return date.ToString("MMM dd, yyyy", CultureInfo.InvariantCulture);
-                case "dd MMM yyyy":
-                    return date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+                case "MMM dd, yyyy": return date.ToString("MMM dd, yyyy", CultureInfo.InvariantCulture);
+                case "dd MMM yyyy": return date.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
                 case "yyyy MMM dd":
-                default:
-                    return date.ToString("yyyy MMM dd", CultureInfo.InvariantCulture);
+                default: return date.ToString("yyyy MMM dd", CultureInfo.InvariantCulture);
             }
         }
 
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Allow dragging the window
             if (e.ButtonState == MouseButtonState.Pressed)
             {
                 this.DragMove();
-                // Save position after dragging
                 SaveSettings();
             }
         }
 
         private void Window_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            // Show context menu on right-click anywhere on the window
             ClockContextMenu.IsOpen = true;
         }
 
         private void Grid_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            // Show context menu on right-click anywhere in the grid (entire window area)
             ClockContextMenu.IsOpen = true;
         }
 
         private void Settings_Click(object sender, RoutedEventArgs e)
         {
             if (settingsWindow == null || !settingsWindow.IsLoaded)
-            {
                 settingsWindow = new SettingsWindow(this);
-            }
-            
             settingsWindow.Show();
             settingsWindow.Activate();
             settingsWindow.Focus();
+        }
+
+        private void ShowSettingsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+                string n6rejPath = Path.Combine(appData, "N6REJ");
+                string[] dirs = Directory.GetDirectories(n6rejPath, "*BearsAdaClock*");
+                if (dirs.Length > 0)
+                    System.Diagnostics.Process.Start("explorer.exe", dirs[0]);
+                else
+                    MessageBox.Show("No settings folder found in AppData.", "Show Settings Folder", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening settings folder: {ex.Message}", "Show Settings Folder", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
@@ -296,13 +286,17 @@ namespace BearsAdaClock
         public void ApplySettings()
         {
             UpdateDisplay();
-            SaveSettings(); // Save settings when applied
-            
-            // Reposition window after settings change since size might have changed
+            SaveSettings();
             this.Dispatcher.BeginInvoke(new Action(() => {
                 var workingArea = SystemParameters.WorkArea;
-                this.Left = workingArea.Right - this.ActualWidth - 64;
-                this.Top = workingArea.Top + 64;
+                if (this.Left < workingArea.Left - this.ActualWidth + 50 ||
+                    this.Left > workingArea.Right - 50 ||
+                    this.Top < workingArea.Top - this.ActualHeight + 50 ||
+                    this.Top > workingArea.Bottom - 50)
+                {
+                    this.Left = workingArea.Right - this.ActualWidth - 64;
+                    this.Top = workingArea.Top + 64;
+                }
             }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
@@ -313,30 +307,48 @@ namespace BearsAdaClock
         }
 
         #region Startup Management
-
         private void InitializeStartupSetting()
         {
             try
             {
-                // Check if this is the first run by looking for a registry marker
                 bool isFirstRun = IsFirstRun();
-                
                 if (isFirstRun)
                 {
-                    // Enable startup by default on first run
                     EnableStartup();
-                    
-                    // Mark that the app has been run before
                     MarkAsRun();
                 }
+                else
+                {
+                    SynchronizeStartupSetting();
+                }
             }
-            catch
-            {
-                // Silently fail if we can't access registry
-                // The user can still manually enable startup in settings
-            }
+            catch { }
         }
-
+        private void SynchronizeStartupSetting()
+        {
+            try
+            {
+                bool registryStartupEnabled = IsStartupEnabledInRegistry();
+                bool settingsStartupEnabled = Settings.Default.StartWithWindows;
+                if (registryStartupEnabled != settingsStartupEnabled)
+                {
+                    Settings.Default.StartWithWindows = registryStartupEnabled;
+                    Settings.Default.Save();
+                }
+            }
+            catch { }
+        }
+        private bool IsStartupEnabledInRegistry()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
+                {
+                    return key?.GetValue("BearsAdaClock") != null;
+                }
+            }
+            catch { return false; }
+        }
         private bool IsFirstRun()
         {
             try
@@ -346,12 +358,8 @@ namespace BearsAdaClock
                     return key?.GetValue("HasRun") == null;
                 }
             }
-            catch
-            {
-                return true; // Assume first run if we can't check
-            }
+            catch { return true; }
         }
-
         private void MarkAsRun()
         {
             try
@@ -361,55 +369,43 @@ namespace BearsAdaClock
                     key?.SetValue("HasRun", "true");
                 }
             }
-            catch
-            {
-                // Silently fail
-            }
+            catch { }
         }
-
         private void EnableStartup()
         {
             try
             {
                 string executablePath = GetExecutablePath();
-
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
                 {
                     key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
                 }
             }
-            catch
-            {
-                // Silently fail - user can enable manually in settings
-            }
+            catch { }
         }
-
         private string GetExecutablePath()
         {
-            // Get the current process executable path
-            string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-            
-            // If it's a .dll (development), try to find the .exe
-            if (processPath.EndsWith(".dll"))
+            try
             {
-                string exePath = Path.ChangeExtension(processPath, ".exe");
-                if (File.Exists(exePath))
-                {
-                    return exePath;
-                }
-                
-                // Fallback to assembly location
+                string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
+                    return processPath;
                 string assemblyPath = Assembly.GetExecutingAssembly().Location;
                 if (assemblyPath.EndsWith(".dll"))
                 {
-                    assemblyPath = Path.ChangeExtension(assemblyPath, ".exe");
+                    string exePath = Path.ChangeExtension(assemblyPath, ".exe");
+                    if (File.Exists(exePath)) return exePath;
+                    string directory = Path.GetDirectoryName(assemblyPath);
+                    string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
+                    string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
+                    if (File.Exists(potentialExePath)) return potentialExePath;
+                    string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
+                    if (File.Exists(clockExePath)) return clockExePath;
                 }
                 return assemblyPath;
             }
-            
-            return processPath;
+            catch { return Assembly.GetExecutingAssembly().Location; }
         }
-
         #endregion
     }
 }

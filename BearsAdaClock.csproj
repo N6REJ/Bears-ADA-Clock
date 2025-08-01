@@ -7,8 +7,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyTitle>Bears ADA Clock</AssemblyTitle>
     <AssemblyDescription>Desktop clock specifically designed for those with accessibility issues</AssemblyDescription>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>25.8.1016.0</AssemblyVersion>
+    <FileVersion>25.8.1016.0</FileVersion>
     <StartupObject>BearsAdaClock.App</StartupObject>
     
     <!-- MSI Installer Properties -->
@@ -17,7 +17,7 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <PackageDescription>Desktop clock specifically designed for those with accessibility issues</PackageDescription>
     <PackageId>BearsAdaClock</PackageId>
-    <PackageVersion>1.0.0.0</PackageVersion>
+    <PackageVersion>25.8.1016.0</PackageVersion>
     <Authors>Troy Hall</Authors>
     <Company>N6REJ</Company>
     <Product>Bears ADA Clock</Product>
