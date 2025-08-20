@@ -7,9 +7,25 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyTitle>Bears ADA Clock</AssemblyTitle>
     <AssemblyDescription>Desktop clock specifically designed for those with accessibility issues</AssemblyDescription>
-    <AssemblyVersion>25.8.1016.0</AssemblyVersion>
-    <FileVersion>25.8.1016.0</FileVersion>
+    <AssemblyVersion>25.8.0</AssemblyVersion>
+    <FileVersion>25.8.0</FileVersion>
     <StartupObject>BearsAdaClock.App</StartupObject>
+    
+    <!-- Self-contained deployment settings with trimming -->
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    
+    <!-- Optimized settings for minimal size while maintaining functionality -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebuggerSupport>false</DebuggerSupport>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
     
     <!-- MSI Installer Properties -->
     <EnableMsixTooling>true</EnableMsixTooling>
@@ -17,7 +33,7 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <PackageDescription>Desktop clock specifically designed for those with accessibility issues</PackageDescription>
     <PackageId>BearsAdaClock</PackageId>
-    <PackageVersion>25.8.1016.0</PackageVersion>
+    <PackageVersion>25.8.0</PackageVersion>
     <Authors>Troy Hall</Authors>
     <Company>N6REJ</Company>
     <Product>Bears ADA Clock</Product>
@@ -44,6 +60,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Update="Properties\Settings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="icons\clock.png">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
@@ -52,10 +76,16 @@
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
+    <None Update="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
     <None Update="README.md">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
+
+
 
 </Project>
