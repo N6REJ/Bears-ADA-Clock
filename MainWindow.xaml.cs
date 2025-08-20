@@ -37,6 +37,11 @@ namespace BearsAdaClock
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             PositionWindow();
+            // Ensure timer is running after window is fully loaded
+            if (timer != null && !timer.IsEnabled)
+            {
+                timer.Start();
+            }
         }
 
         private void LoadSettings()
@@ -111,10 +116,34 @@ namespace BearsAdaClock
 
         private void InitializeTimer()
         {
-            timer = new DispatcherTimer();
-            timer.Interval = TimeSpan.FromSeconds(1);
-            timer.Tick += Timer_Tick;
-            timer.Start();
+            try
+            {
+                timer = new DispatcherTimer();
+                timer.Interval = TimeSpan.FromSeconds(1);
+                timer.Tick += Timer_Tick;
+                timer.Start();
+            }
+            catch (Exception ex)
+            {
+                // Log the error and try to reinitialize after a delay
+                System.Diagnostics.Debug.WriteLine($"Timer initialization failed: {ex.Message}");
+                this.Dispatcher.BeginInvoke(new Action(() => {
+                    try
+                    {
+                        if (timer == null)
+                        {
+                            timer = new DispatcherTimer();
+                            timer.Interval = TimeSpan.FromSeconds(1);
+                            timer.Tick += Timer_Tick;
+                        }
+                        if (!timer.IsEnabled)
+                        {
+                            timer.Start();
+                        }
+                    }
+                    catch { }
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
         }
 
         private void PositionWindow()
@@ -314,7 +343,9 @@ namespace BearsAdaClock
                 bool isFirstRun = IsFirstRun();
                 if (isFirstRun)
                 {
-                    EnableStartup();
+                    RegistryHelper.SetStartup(true);
+                    Settings.Default.StartWithWindows = true;
+                    Settings.Default.Save();
                     MarkAsRun();
                 }
                 else
@@ -324,11 +355,12 @@ namespace BearsAdaClock
             }
             catch { }
         }
+        
         private void SynchronizeStartupSetting()
         {
             try
             {
-                bool registryStartupEnabled = IsStartupEnabledInRegistry();
+                bool registryStartupEnabled = RegistryHelper.IsStartupEnabled();
                 bool settingsStartupEnabled = Settings.Default.StartWithWindows;
                 if (registryStartupEnabled != settingsStartupEnabled)
                 {
@@ -338,17 +370,7 @@ namespace BearsAdaClock
             }
             catch { }
         }
-        private bool IsStartupEnabledInRegistry()
-        {
-            try
-            {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
-                {
-                    return key?.GetValue("BearsAdaClock") != null;
-                }
-            }
-            catch { return false; }
-        }
+        
         private bool IsFirstRun()
         {
             try
@@ -360,6 +382,7 @@ namespace BearsAdaClock
             }
             catch { return true; }
         }
+        
         private void MarkAsRun()
         {
             try
@@ -370,41 +393,6 @@ namespace BearsAdaClock
                 }
             }
             catch { }
-        }
-        private void EnableStartup()
-        {
-            try
-            {
-                string executablePath = GetExecutablePath();
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
-                }
-            }
-            catch { }
-        }
-        private string GetExecutablePath()
-        {
-            try
-            {
-                string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
-                    return processPath;
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                if (assemblyPath.EndsWith(".dll"))
-                {
-                    string exePath = Path.ChangeExtension(assemblyPath, ".exe");
-                    if (File.Exists(exePath)) return exePath;
-                    string directory = Path.GetDirectoryName(assemblyPath);
-                    string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                    string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                    if (File.Exists(potentialExePath)) return potentialExePath;
-                    string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
-                    if (File.Exists(clockExePath)) return clockExePath;
-                }
-                return assemblyPath;
-            }
-            catch { return Assembly.GetExecutingAssembly().Location; }
         }
         #endregion
     }
