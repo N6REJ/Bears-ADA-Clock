@@ -7,8 +7,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyTitle>Bears ADA Clock</AssemblyTitle>
     <AssemblyDescription>Desktop clock specifically designed for those with accessibility issues</AssemblyDescription>
-    <AssemblyVersion>2025.9.21</AssemblyVersion>
-    <FileVersion>2025.9.21</FileVersion>
+    <AssemblyVersion>2025.9.21.1</AssemblyVersion>
+    <FileVersion>2025.9.21.1</FileVersion>
     <StartupObject>BearsAdaClock.App</StartupObject>
     
     <!-- Self-contained deployment settings with trimming -->
@@ -33,7 +33,7 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <PackageDescription>Desktop clock specifically designed for those with accessibility issues</PackageDescription>
     <PackageId>BearsAdaClock</PackageId>
-    <PackageVersion>2025.9.21</PackageVersion>
+    <PackageVersion>2025.9.21.1</PackageVersion>
     <Authors>Troy Hall</Authors>
     <Company>N6REJ</Company>
     <Product>Bears ADA Clock</Product>
@@ -44,7 +44,7 @@
     <PackageSupportUrl>https://github.com/N6REJ/Bears-ADA-Clock/issues</PackageSupportUrl>
     <ApplicationIcon>icons\clock.ico</ApplicationIcon>
     <Title>Bears ADA Clock</Title>
-    <Description>Accessibilty focused desktop clock</Description>
+    <Description>Accessibility focused desktop clock</Description>
     <PackageIcon>clock.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseFile>License.rtf</PackageLicenseFile>
