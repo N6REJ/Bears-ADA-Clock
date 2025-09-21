@@ -97,12 +97,22 @@ namespace BearsAdaClock
             try
             {
                 bool hasShortcut = File.Exists(GetStartupShortcutPath());
-                bool hasRunEntry = false;
+
+                // Backward compatibility with existing Run key entries
+                bool hasValidRunEntry = false;
                 bool isDisabledByApproval = false;
+                string? runRaw = null;
+                string? runExe = null;
 
                 using (RegistryKey runKey = Registry.CurrentUser.OpenSubKey(RUN_REGISTRY_PATH, false))
                 {
-                    hasRunEntry = runKey?.GetValue(APP_NAME) != null;
+                    object? val = runKey?.GetValue(APP_NAME);
+                    runRaw = val as string;
+                    runExe = ExtractExeFromRunValue(runRaw);
+                    if (!string.IsNullOrWhiteSpace(runExe))
+                    {
+                        hasValidRunEntry = File.Exists(runExe);
+                    }
                 }
 
                 using (RegistryKey approvedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
@@ -115,8 +125,8 @@ namespace BearsAdaClock
                     }
                 }
 
-                bool enabled = hasShortcut || (hasRunEntry && !isDisabledByApproval);
-                Log($"IsStartupEnabled => {enabled} hasShortcut={hasShortcut} hasRunEntry={hasRunEntry} disabledByApproval={isDisabledByApproval}");
+                bool enabled = hasShortcut || (hasValidRunEntry && !isDisabledByApproval);
+                Log($"IsStartupEnabled => {enabled} hasShortcut={hasShortcut} hasValidRunEntry={hasValidRunEntry} runRaw='{runRaw}' runExe='{runExe}' disabledByApproval={isDisabledByApproval}");
                 return enabled;
             }
             catch (Exception ex)
@@ -124,6 +134,24 @@ namespace BearsAdaClock
                 Log("IsStartupEnabled error: " + ex.Message);
                 return false;
             }
+        }
+
+        private static string? ExtractExeFromRunValue(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return null;
+            string s = value.Trim();
+            try
+            {
+                if (s.StartsWith("\""))
+                {
+                    int end = s.IndexOf('"', 1);
+                    if (end > 1)
+                        return s.Substring(1, end - 1);
+                }
+                int space = s.IndexOf(' ');
+                return space > 0 ? s.Substring(0, space) : s;
+            }
+            catch { return null; }
         }
 
         private static string GetStartupShortcutPath()

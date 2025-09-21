@@ -18,6 +18,20 @@ namespace BearsAdaClock
         {
             InitializeComponent();
             mainWindow = parent;
+
+            // Set version text from assembly file version
+            try
+            {
+                var asm = Assembly.GetExecutingAssembly();
+                string? file = asm.Location;
+                string version = System.Diagnostics.FileVersionInfo.GetVersionInfo(file).FileVersion ?? asm.GetName().Version?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(version))
+                {
+                    VersionText.Text = $"Version {version}";
+                }
+            }
+            catch { }
+
             LoadCurrentSettings();
             UpdatePreview();
         }
