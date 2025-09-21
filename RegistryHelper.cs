@@ -12,48 +12,39 @@ namespace BearsAdaClock
         private const string STARTUP_APPROVED_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
         private const string APP_NAME = "BearsAdaClock";
 
+        // Prefer Startup folder shortcut like other working projects; keep registry cleanup for compatibility
         public static void SetStartup(bool enabled)
         {
             try
             {
                 string exePath = GetExecutablePath();
+                string shortcutPath = GetStartupShortcutPath();
 
                 using (RegistryKey runKey = Registry.CurrentUser.CreateSubKey(RUN_REGISTRY_PATH, true))
                 using (RegistryKey approvedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
                 {
                     if (enabled)
                     {
-                        // Write/refresh the Run key value
-                        runKey?.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
+                        // Create Startup shortcut (preferred and reliable at user logon)
+                        CreateStartupShortcut(shortcutPath, exePath);
 
-                        // Clear any disabled marker in StartupApproved so Windows will launch it
-                        try
-                        {
-                            if (approvedKey?.GetValue(APP_NAME) != null)
-                            {
-                                approvedKey.DeleteValue(APP_NAME, false);
-                            }
-                        }
-                        catch { }
+                        // Clean any stale Run/StartupApproved entries to avoid duplicates/conflicts
+                        try { if (runKey?.GetValue(APP_NAME) != null) runKey.DeleteValue(APP_NAME, false); } catch { }
+                        try { if (approvedKey?.GetValue(APP_NAME) != null) approvedKey.DeleteValue(APP_NAME, false); } catch { }
                     }
                     else
                     {
-                        // Remove the Run key value
-                        try
-                        {
-                            if (runKey?.GetValue(APP_NAME) != null)
-                            {
-                                runKey.DeleteValue(APP_NAME, false);
-                            }
-                        }
-                        catch { }
+                        // Remove Startup shortcut
+                        DeleteStartupShortcut(shortcutPath);
 
-                        // Mark as disabled in StartupApproved so Windows reflects the state in Startup Apps UI
+                        // Remove old Run entry
+                        try { if (runKey?.GetValue(APP_NAME) != null) runKey.DeleteValue(APP_NAME, false); } catch { }
+
+                        // Mark as disabled in StartupApproved so Windows reflects state in Startup Apps UI
                         try
                         {
-                            // 0x03 indicates disabled; remaining bytes are timestamp metadata (zeros are acceptable)
                             byte[] disabled = new byte[12];
-                            disabled[0] = 0x03;
+                            disabled[0] = 0x03; // 0x03 indicates disabled
                             approvedKey?.SetValue(APP_NAME, disabled, RegistryValueKind.Binary);
                         }
                         catch { }
@@ -70,6 +61,9 @@ namespace BearsAdaClock
         {
             try
             {
+                bool hasShortcut = File.Exists(GetStartupShortcutPath());
+
+                // Backward compatibility with existing Run key entries
                 bool hasRunEntry = false;
                 bool isDisabledByApproval = false;
 
@@ -88,12 +82,69 @@ namespace BearsAdaClock
                     }
                 }
 
-                return hasRunEntry && !isDisabledByApproval;
+                return hasShortcut || (hasRunEntry && !isDisabledByApproval);
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static string GetStartupShortcutPath()
+        {
+            string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+            return Path.Combine(startupFolder, APP_NAME + ".lnk");
+        }
+
+        private static void CreateStartupShortcut(string shortcutPath, string exePath)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(shortcutPath)!);
+
+                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null)
+                    throw new InvalidOperationException("WScript.Shell COM not available");
+
+                dynamic shell = Activator.CreateInstance(shellType)!;
+                dynamic lnk = shell.CreateShortcut(shortcutPath);
+                lnk.TargetPath = exePath;
+                lnk.WorkingDirectory = Path.GetDirectoryName(exePath);
+                lnk.WindowStyle = 1;
+                lnk.Description = "Bears ADA Clock";
+                lnk.IconLocation = exePath + ",0";
+                lnk.Save();
+            }
+            catch (Exception)
+            {
+                // As a fallback, if shortcut creation fails for any reason, write/refresh the Run key
+                try
+                {
+                    using (RegistryKey runKey = Registry.CurrentUser.CreateSubKey(RUN_REGISTRY_PATH, true))
+                    {
+                        runKey?.SetValue(APP_NAME, $"\"{GetExecutablePath()}\"", RegistryValueKind.String);
+                    }
+
+                    // Clear any disabled marker so Windows will launch it
+                    using (RegistryKey approvedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
+                    {
+                        try { if (approvedKey?.GetValue(APP_NAME) != null) approvedKey.DeleteValue(APP_NAME, false); } catch { }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        private static void DeleteStartupShortcut(string shortcutPath)
+        {
+            try
+            {
+                if (File.Exists(shortcutPath))
+                {
+                    File.Delete(shortcutPath);
+                }
+            }
+            catch { }
         }
 
         private static string GetExecutablePath()
