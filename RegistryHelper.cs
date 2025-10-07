@@ -2,7 +2,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 
 namespace BearsAdaClock
 {
@@ -135,23 +134,18 @@ namespace BearsAdaClock
                     return exePath;
                 }
                 
-                // Fallback to assembly location (for non-single-file deployments)
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                if (!string.IsNullOrEmpty(assemblyPath))
+                // Fallback using AppContext.BaseDirectory (works for single-file and regular deployments)
+                string baseDir = AppContext.BaseDirectory;
+                if (!string.IsNullOrEmpty(baseDir))
                 {
-                    if (assemblyPath.EndsWith(".dll"))
-                    {
-                        string dllExePath = Path.ChangeExtension(assemblyPath, ".exe");
-                        if (File.Exists(dllExePath)) { Logger.Info($"GetExecutablePath -> using dll exe '{dllExePath}'"); return dllExePath; }
-                        string directory = Path.GetDirectoryName(assemblyPath);
-                        string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                        string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                        if (File.Exists(potentialExePath)) { Logger.Info($"GetExecutablePath -> using assembly exe '{potentialExePath}'"); return potentialExePath; }
-                        string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
-                        if (File.Exists(clockExePath)) { Logger.Info($"GetExecutablePath -> using clock exe '{clockExePath}'"); return clockExePath; }
-                    }
-                    Logger.Info($"GetExecutablePath -> using assembly path '{assemblyPath}'");
-                    return assemblyPath;
+                    string clockExePath = Path.Combine(baseDir, "BearsAdaClock.exe");
+                    if (File.Exists(clockExePath)) { Logger.Info($"GetExecutablePath -> using baseDir clock exe '{clockExePath}'"); return clockExePath; }
+
+                    // Try to infer exe name from process
+                    string procName = (Process.GetCurrentProcess().ProcessName ?? "BearsAdaClock").Trim();
+                    if (!procName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) procName += ".exe";
+                    string byProcName = Path.Combine(baseDir, procName);
+                    if (File.Exists(byProcName)) { Logger.Info($"GetExecutablePath -> using baseDir proc exe '{byProcName}'"); return byProcName; }
                 }
                 
                 // Final fallback - use the process path or base directory

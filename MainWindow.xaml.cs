@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -481,24 +480,28 @@ namespace BearsAdaClock
         {
             try
             {
+                // Prefer the actual process main module path
                 string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
+                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                     return processPath;
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                if (assemblyPath.EndsWith(".dll"))
+
+                // Then try AppContext.BaseDirectory with known exe names
+                string baseDir = AppContext.BaseDirectory;
+                if (!string.IsNullOrEmpty(baseDir))
                 {
-                    string exePath = Path.ChangeExtension(assemblyPath, ".exe");
-                    if (File.Exists(exePath)) return exePath;
-                    string directory = Path.GetDirectoryName(assemblyPath);
-                    string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                    string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                    if (File.Exists(potentialExePath)) return potentialExePath;
-                    string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
+                    string clockExePath = Path.Combine(baseDir, "BearsAdaClock.exe");
                     if (File.Exists(clockExePath)) return clockExePath;
+
+                    string procName = (System.Diagnostics.Process.GetCurrentProcess().ProcessName ?? "BearsAdaClock").Trim();
+                    if (!procName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) procName += ".exe";
+                    string byProcName = Path.Combine(baseDir, procName);
+                    if (File.Exists(byProcName)) return byProcName;
                 }
-                return assemblyPath;
+
+                // Final fallback to base directory
+                return baseDir ?? string.Empty;
             }
-            catch { return Assembly.GetExecutingAssembly().Location; }
+            catch { return AppContext.BaseDirectory; }
         }
         #endregion
     }

@@ -275,3 +275,30 @@ For support and updates, visit: https://hallhome.us/software
   - In the app, right-click the clock and choose: Show Logs Folder
 - On startup the app logs a confirmation line near the top: "Logger path in use: C:\\Users\\<YourUser>\\AppData\\Local\\BearsAdaClock\\logs\\ada-clock.log"
   - The same resolved path is exposed programmatically as: Logger.LogFilePath
+
+
+
+## Installer notes for .NET 6 and dependency warnings
+
+- When building the MSI via the Visual Studio Installer Projects extension, you may see warnings like:
+  - WARNING: Unable to find dependency 'SYSTEM.CONFIGURATION.CONFIGURATIONMANAGER' ...
+  - WARNING: Unable to find dependency 'MICROSOFT.WIN32.REGISTRY' ...
+  - WARNING: Unable to find dependency 'SYSTEM.DIAGNOSTICS.PROCESS' ...
+  - WARNING: Unable to find dependency 'SYSTEM.RUNTIME' ...
+- These are expected for .NET 6/7 apps packaged as framework-dependent. Those assemblies are part of the shared .NET runtime and do not ship as separate files next to your app. The installer still packages the correct .NET 6 artifacts (BearsAdaClock.exe, BearsAdaClock.dll, BearsAdaClock.deps.json, BearsAdaClock.runtimeconfig.json, fonts, and assets). The MSI build will succeed and the app will run provided the .NET 6 Desktop Runtime is installed on the target machine.
+
+What we changed
+- The Installer project now sources application files from the publish output folder: bin\Release\net6.0-windows\win-x64\publish. This is the recommended input for MSI packaging.
+- The legacy .NET Framework 4.7.2 launch condition was removed to avoid mixed prerequisites for a .NET 6 application.
+
+Eliminating the warnings (optional)
+- Best option: publish self-contained so all dependencies live next to the EXE. Then build the Installer (it already points at the publish folder) and the dependency warnings should disappear.
+
+How to publish self-contained (win-x64)
+- Visual Studio: Right-click project → Publish → New profile → Folder → Target runtime: win-x64 → Deployment mode: Self-contained → Finish → Publish.
+- CLI:
+  - dotnet publish -c Release -r win-x64 --self-contained true
+  - Output will be in bin\Release\net6.0-windows\win-x64\publish
+
+Notes
+- If you keep framework-dependent publish, the warnings may still appear, but they are benign; ensure .NET 6 Desktop Runtime is present on target machines.
