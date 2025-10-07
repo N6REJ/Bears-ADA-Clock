@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -16,6 +15,7 @@ namespace BearsAdaClock
     {
         private DispatcherTimer timer;
         private SettingsWindow settingsWindow;
+        private bool _firstUpdateLogged = false;
         public double DigitSize { get; set; } = 56;
         public double DateSize { get; set; } = 32;
         public Brush DigitColor { get; set; } = Brushes.Black;
@@ -26,22 +26,22 @@ namespace BearsAdaClock
 
         public MainWindow()
         {
+            Logger.Info("MainWindow constructor - begin");
             InitializeComponent();
             LoadSettings();
+            Logger.Info($"Settings loaded: DigitSize={DigitSize}, DateSize={DateSize}, DateFormat='{DateFormat}', DisplayMode='{DisplayMode}', ShowSeconds={ShowSeconds}");
             InitializeTimer();
             UpdateDisplay();
             this.Loaded += MainWindow_Loaded;
+            this.ContentRendered += (s, e) => Logger.Info($"MainWindow ContentRendered - Bounds L={this.Left:F0} T={this.Top:F0} W={this.ActualWidth:F0} H={this.ActualHeight:F0}, Visible={this.IsVisible}");
             InitializeStartupSetting();
+            Logger.Info("MainWindow constructor - end");
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            Logger.Info("MainWindow Loaded event");
             PositionWindow();
-            // Ensure timer is running after window is fully loaded
-            if (timer != null && !timer.IsEnabled)
-            {
-                timer.Start();
-            }
         }
 
         private void LoadSettings()
@@ -116,34 +116,10 @@ namespace BearsAdaClock
 
         private void InitializeTimer()
         {
-            try
-            {
-                timer = new DispatcherTimer();
-                timer.Interval = TimeSpan.FromSeconds(1);
-                timer.Tick += Timer_Tick;
-                timer.Start();
-            }
-            catch (Exception ex)
-            {
-                // Log the error and try to reinitialize after a delay
-                System.Diagnostics.Debug.WriteLine($"Timer initialization failed: {ex.Message}");
-                this.Dispatcher.BeginInvoke(new Action(() => {
-                    try
-                    {
-                        if (timer == null)
-                        {
-                            timer = new DispatcherTimer();
-                            timer.Interval = TimeSpan.FromSeconds(1);
-                            timer.Tick += Timer_Tick;
-                        }
-                        if (!timer.IsEnabled)
-                        {
-                            timer.Start();
-                        }
-                    }
-                    catch { }
-                }), System.Windows.Threading.DispatcherPriority.Background);
-            }
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(1);
+            timer.Tick += Timer_Tick;
+            timer.Start();
         }
 
         private void PositionWindow()
@@ -151,6 +127,7 @@ namespace BearsAdaClock
             try
             {
                 var workingArea = SystemParameters.WorkArea;
+                Logger.Info($"PositionWindow - WorkArea L={workingArea.Left} T={workingArea.Top} R={workingArea.Right} B={workingArea.Bottom}; Stored L={Settings.Default.WindowLeft} T={Settings.Default.WindowTop}");
                 if (Settings.Default.WindowLeft >= 0 && Settings.Default.WindowTop >= 0)
                 {
                     if (Settings.Default.WindowLeft >= workingArea.Left &&
@@ -160,15 +137,18 @@ namespace BearsAdaClock
                     {
                         this.Left = Settings.Default.WindowLeft;
                         this.Top = Settings.Default.WindowTop;
+                        Logger.Info($"PositionWindow - Using stored position L={this.Left} T={this.Top}");
                         return;
                     }
                 }
                 this.Left = workingArea.Right - this.ActualWidth - 64;
                 this.Top = workingArea.Top + 64;
+                Logger.Info($"PositionWindow - Using default position L={this.Left} T={this.Top}");
                 SaveSettings();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Error(ex, "PositionWindow failed - centering window");
                 this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
         }
@@ -181,6 +161,11 @@ namespace BearsAdaClock
         private void UpdateDisplay()
         {
             var now = DateTime.Now;
+            if (!_firstUpdateLogged)
+            {
+                Logger.Info($"UpdateDisplay (first) - ShowSeconds={ShowSeconds}, DisplayMode='{DisplayMode}', DigitSize={DigitSize}, DateSize={DateSize}");
+                _firstUpdateLogged = true;
+            }
             string timeFormat = ShowSeconds ? "HH:mm:ss" : "HH:mm";
             TimeDisplay.Text = now.ToString(timeFormat);
             TimeDisplay.FontSize = DigitSize;
@@ -306,10 +291,64 @@ namespace BearsAdaClock
             }
         }
 
+        private void ShowLogsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string logsDir = Logger.LogDirectory; // resolved by Logger
+                if (!Directory.Exists(logsDir))
+                {
+                    Directory.CreateDirectory(logsDir);
+                }
+                System.Diagnostics.Process.Start("explorer.exe", logsDir);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening logs folder: {ex.Message}", "Logs Folder", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
+            Logger.Info("Exit_Click - shutting down");
             SaveSettings();
             Application.Current.Shutdown();
+        }
+
+        private void ClockContextMenu_Opened(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                bool enabled = RegistryHelper.IsStartupEnabled();
+                if (StartWithWindowsMenu != null)
+                {
+                    StartWithWindowsMenu.IsChecked = enabled;
+                }
+                Logger.Info($"Context menu opened - StartWithWindows checked={enabled}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "ClockContextMenu_Opened failed");
+            }
+        }
+
+        private void StartWithWindowsMenu_Click(object sender, RoutedEventArgs e)
+        {
+            if (StartWithWindowsMenu == null) return;
+            bool enable = StartWithWindowsMenu.IsChecked;
+            try
+            {
+                RegistryHelper.SetStartup(enable);
+                Settings.Default.StartWithWindows = enable;
+                Settings.Default.Save();
+                Logger.Info($"StartWithWindowsMenu_Click - set to {enable}");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "StartWithWindowsMenu_Click failed");
+                MessageBox.Show($"Failed to update startup setting: {ex.Message}", "Startup Setting Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                StartWithWindowsMenu.IsChecked = !enable; // revert
+            }
         }
 
         public void ApplySettings()
@@ -331,6 +370,7 @@ namespace BearsAdaClock
 
         protected override void OnClosed(EventArgs e)
         {
+            Logger.Info("MainWindow.OnClosed - saving settings and exiting");
             SaveSettings();
             base.OnClosed(e);
         }
@@ -341,11 +381,11 @@ namespace BearsAdaClock
             try
             {
                 bool isFirstRun = IsFirstRun();
+                Logger.Info($"InitializeStartupSetting - isFirstRun={isFirstRun}");
                 if (isFirstRun)
                 {
-                    RegistryHelper.SetStartup(true);
-                    Settings.Default.StartWithWindows = true;
-                    Settings.Default.Save();
+                    EnableStartup();
+                    Logger.Info("InitializeStartupSetting - Enabled startup on first run.");
                     MarkAsRun();
                 }
                 else
@@ -353,24 +393,55 @@ namespace BearsAdaClock
                     SynchronizeStartupSetting();
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "InitializeStartupSetting failed");
+            }
         }
-        
         private void SynchronizeStartupSetting()
         {
             try
             {
-                bool registryStartupEnabled = RegistryHelper.IsStartupEnabled();
+                bool registryStartupEnabled = IsStartupEnabledInRegistry();
                 bool settingsStartupEnabled = Settings.Default.StartWithWindows;
-                if (registryStartupEnabled != settingsStartupEnabled)
+                Logger.Info($"SynchronizeStartupSetting - registry={registryStartupEnabled}, settings={settingsStartupEnabled}");
+
+                // Enforce the user's stored preference. If they want it to start with Windows,
+                // recreate the Startup shortcut/Run entry if it was removed or disabled.
+                if (settingsStartupEnabled && !registryStartupEnabled)
                 {
-                    Settings.Default.StartWithWindows = registryStartupEnabled;
+                    RegistryHelper.SetStartup(true);
+                    // Save remains true as per preference
+                    Settings.Default.StartWithWindows = true;
                     Settings.Default.Save();
+                    Logger.Info("SynchronizeStartupSetting - Re-enabled autostart per settings.");
+                }
+                // If the user disabled it in settings but registry still has it enabled, turn it off.
+                else if (!settingsStartupEnabled && registryStartupEnabled)
+                {
+                    RegistryHelper.SetStartup(false);
+                    Settings.Default.StartWithWindows = false;
+                    Settings.Default.Save();
+                    Logger.Info("SynchronizeStartupSetting - Disabled autostart per settings.");
+                }
+                // If both match, nothing to do.
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "SynchronizeStartupSetting failed");
+            }
+        }
+        private bool IsStartupEnabledInRegistry()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
+                {
+                    return key?.GetValue("BearsAdaClock") != null;
                 }
             }
-            catch { }
+            catch { return false; }
         }
-        
         private bool IsFirstRun()
         {
             try
@@ -382,7 +453,6 @@ namespace BearsAdaClock
             }
             catch { return true; }
         }
-        
         private void MarkAsRun()
         {
             try
@@ -393,6 +463,45 @@ namespace BearsAdaClock
                 }
             }
             catch { }
+        }
+        private void EnableStartup()
+        {
+            try
+            {
+                string executablePath = GetExecutablePath();
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
+                }
+            }
+            catch { }
+        }
+        private string GetExecutablePath()
+        {
+            try
+            {
+                // Prefer the actual process main module path
+                string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                    return processPath;
+
+                // Then try AppContext.BaseDirectory with known exe names
+                string baseDir = AppContext.BaseDirectory;
+                if (!string.IsNullOrEmpty(baseDir))
+                {
+                    string clockExePath = Path.Combine(baseDir, "BearsAdaClock.exe");
+                    if (File.Exists(clockExePath)) return clockExePath;
+
+                    string procName = (System.Diagnostics.Process.GetCurrentProcess().ProcessName ?? "BearsAdaClock").Trim();
+                    if (!procName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) procName += ".exe";
+                    string byProcName = Path.Combine(baseDir, procName);
+                    if (File.Exists(byProcName)) return byProcName;
+                }
+
+                // Final fallback to base directory
+                return baseDir ?? string.Empty;
+            }
+            catch { return AppContext.BaseDirectory; }
         }
         #endregion
     }
