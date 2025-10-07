@@ -399,29 +399,14 @@ namespace BearsAdaClock
 
         private bool IsStartupEnabled()
         {
-            try
-            {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
-                {
-                    return key?.GetValue("BearsAdaClock") != null;
-                }
-            }
-            catch
-            {
-                return false;
-            }
+            return RegistryHelper.IsStartupEnabled();
         }
 
         private void EnableStartup()
         {
             try
             {
-                string executablePath = GetExecutablePath();
-
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
-                }
+                RegistryHelper.SetStartup(true);
                 
                 // Save startup setting
                 Settings.Default.StartWithWindows = true;
@@ -437,13 +422,7 @@ namespace BearsAdaClock
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    if (key?.GetValue("BearsAdaClock") != null)
-                    {
-                        key.DeleteValue("BearsAdaClock");
-                    }
-                }
+                RegistryHelper.SetStartup(false);
                 
                 // Save startup setting
                 Settings.Default.StartWithWindows = false;
@@ -452,57 +431,6 @@ namespace BearsAdaClock
             catch (Exception ex)
             {
                 throw new Exception($"Unable to remove from startup: {ex.Message}");
-            }
-        }
-
-        private string GetExecutablePath()
-        {
-            try
-            {
-                // First try to get the main module file name
-                string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                
-                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
-                {
-                    return processPath;
-                }
-                
-                // Fallback to assembly location
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                
-                // If it's a .dll (development/self-contained), try to find the .exe
-                if (assemblyPath.EndsWith(".dll"))
-                {
-                    string exePath = Path.ChangeExtension(assemblyPath, ".exe");
-                    if (File.Exists(exePath))
-                    {
-                        return exePath;
-                    }
-                    
-                    // Try looking in the same directory for an exe with the assembly name
-                    string directory = Path.GetDirectoryName(assemblyPath);
-                    string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                    string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                    if (File.Exists(potentialExePath))
-                    {
-                        return potentialExePath;
-                    }
-                    
-                    // Look for BearsAdaClock.exe specifically
-                    string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
-                    if (File.Exists(clockExePath))
-                    {
-                        return clockExePath;
-                    }
-                }
-                
-                // Return the assembly path as last resort
-                return assemblyPath;
-            }
-            catch
-            {
-                // Final fallback - use assembly location
-                return Assembly.GetExecutingAssembly().Location;
             }
         }
 
