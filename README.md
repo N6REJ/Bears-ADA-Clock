@@ -119,6 +119,32 @@ A desktop clock specifically designed for those with accessibility issues, featu
 - **Clean Uninstall**: Complete removal of all files and registry entries
 - **Shared Runtime**: Benefits from shared .NET runtime (faster startup, security updates)
 
+## Logs
+
+Where to find the log file(s):
+- Primary: %LocalAppData%\BearsAdaClock\logs\ada-clock.log
+- Fallback (if LocalAppData is unavailable): %TEMP%\ada-clock.log
+
+Quick access:
+- Right-click the clock and choose "Show Logs Folder" to open the exact folder the app is using.
+
+Notes:
+- On startup, the app writes an entry like "Logger path in use: C:\\Users\\<You>\\AppData\\Local\\BearsAdaClock\\logs\\ada-clock.log" near the top of the log. This confirms the active path after any reinstall or Windows restart.
+
+What gets logged:
+- App lifecycle: startup, activation, exit
+- Window: construction, loaded, content rendered, positioning decisions
+- Settings: load/save, upgrade, apply
+- Context menu: open state, Start with Windows toggle
+- Registry operations for autostart (Run and StartupApproved keys)
+- Unhandled exceptions from AppDomain, Dispatcher, and TaskScheduler
+
+Log rotation:
+- The log file automatically rotates at ~1 MB into timestamped archives, keeping the current file small.
+
+Troubleshooting startup visibility:
+- If Windows shows the app in Startup Apps but no UI appears, check the log around "App.OnStartup" and "MainWindow constructor" entries for errors or immediate shutdown.
+
 ## Usage
 
 ### Basic Operation
@@ -149,6 +175,7 @@ The settings window provides comprehensive customization:
    - Toggle "Start with Windows" to automatically launch the clock at login
    - Enabled by default for convenience
    - Automatically configures Windows startup registry entries
+   - You can also toggle this from the clock's right-click context menu (Start with Windows)
 
 5. **Preview Section**:
    - See exactly how your settings will look
@@ -237,3 +264,14 @@ This project is open source under the MIT License. See LICENSE file for details.
 Contributions are welcome, especially those that improve accessibility features. Please ensure all new features maintain full screen reader compatibility.
 
 For support and updates, visit: https://hallhome.us/software
+
+## Exact log path explained
+
+- %LocalAppData% is a Windows environment variable that expands to: C:\Users\<YourUser>\AppData\Local
+- Therefore, the full log file path is: C:\Users\<YourUser>\AppData\Local\BearsAdaClock\logs\ada-clock.log
+- Replace <YourUser> with your Windows account name. Example: C:\Users\Troy\AppData\Local\BearsAdaClock\logs\ada-clock.log
+- Quick ways to open the folder:
+  - Press Win+R, paste: %LocalAppData%\BearsAdaClock\logs and press Enter
+  - In the app, right-click the clock and choose: Show Logs Folder
+- On startup the app logs a confirmation line near the top: "Logger path in use: C:\\Users\\<YourUser>\\AppData\\Local\\BearsAdaClock\\logs\\ada-clock.log"
+  - The same resolved path is exposed programmatically as: Logger.LogFilePath
