@@ -330,11 +330,24 @@ namespace BearsAdaClock
             {
                 bool registryStartupEnabled = IsStartupEnabledInRegistry();
                 bool settingsStartupEnabled = Settings.Default.StartWithWindows;
-                if (registryStartupEnabled != settingsStartupEnabled)
+
+                // Enforce the user's stored preference. If they want it to start with Windows,
+                // recreate the Startup shortcut/Run entry if it was removed or disabled.
+                if (settingsStartupEnabled && !registryStartupEnabled)
                 {
-                    Settings.Default.StartWithWindows = registryStartupEnabled;
+                    RegistryHelper.SetStartup(true);
+                    // Save remains true as per preference
+                    Settings.Default.StartWithWindows = true;
                     Settings.Default.Save();
                 }
+                // If the user disabled it in settings but registry still has it enabled, turn it off.
+                else if (!settingsStartupEnabled && registryStartupEnabled)
+                {
+                    RegistryHelper.SetStartup(false);
+                    Settings.Default.StartWithWindows = false;
+                    Settings.Default.Save();
+                }
+                // If both match, nothing to do.
             }
             catch { }
         }
