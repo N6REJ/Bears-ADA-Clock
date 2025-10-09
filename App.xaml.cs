@@ -9,26 +9,42 @@ namespace BearsAdaClock
     {
         protected override void OnStartup(StartupEventArgs e)
         {
+            Logger.Info("=== Application Starting ===");
+            Logger.Info($"Command line args: {string.Join(" ", e.Args)}");
+            
             base.OnStartup(e);
             
             // Simple settings initialization
             try
             {
+                Logger.Info("Initializing settings...");
+                
                 // Check if this is a fresh installation
                 if (Settings.Default.UpgradeRequired)
                 {
+                    Logger.Info("Upgrading settings from previous version");
                     Settings.Default.Upgrade();
                     Settings.Default.UpgradeRequired = false;
                     Settings.Default.Save();
+                    Logger.Info("Settings upgraded successfully");
                 }
+                
+                Logger.Info($"Logging enabled: {Settings.Default.EnableLogging}");
+                Logger.Info($"Start with Windows: {Settings.Default.StartWithWindows}");
+                Logger.Info($"Display mode: {Settings.Default.DisplayMode}");
+                Logger.Info($"Window position: Left={Settings.Default.WindowLeft}, Top={Settings.Default.WindowTop}");
             }
             catch (Exception ex)
             {
+                Logger.Error("Settings initialization failed", ex);
                 System.Diagnostics.Debug.WriteLine($"Settings initialization failed: {ex.Message}");
                 // Reset to defaults if settings are corrupted
                 Settings.Default.Reset();
                 Settings.Default.Save();
+                Logger.Info("Settings reset to defaults");
             }
+            
+            Logger.Info("Application startup completed");
         }
         
         protected override void OnActivated(EventArgs e)

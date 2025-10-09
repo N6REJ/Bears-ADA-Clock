@@ -154,6 +154,32 @@
                 </StackPanel>
             </GroupBox>
             
+            <!-- Advanced Settings -->
+            <GroupBox Header="Advanced Settings" Padding="10" AutomationProperties.Name="Advanced Settings Group" Margin="0,0,0,15">
+                <StackPanel>
+                    <CheckBox x:Name="EnableLoggingCheckBox" 
+                              Content="Enable Logging" 
+                              IsChecked="True"
+                              Checked="EnableLoggingCheckBox_Changed"
+                              Unchecked="EnableLoggingCheckBox_Changed"
+                              AutomationProperties.Name="Enable Logging Checkbox - Toggle application logging"/>
+                    <TextBlock Text="When enabled, the application will log events and errors to help with troubleshooting." 
+                               FontSize="11" 
+                               Foreground="Gray" 
+                               Margin="20,5,0,10" 
+                               TextWrapping="Wrap"
+                               AutomationProperties.Name="Logging option description"/>
+                    <Button x:Name="OpenLogFolderButton" 
+                            Content="Open Log Folder" 
+                            Width="150" 
+                            Height="30" 
+                            HorizontalAlignment="Left"
+                            Margin="20,0,0,0"
+                            Click="OpenLogFolder_Click"
+                            AutomationProperties.Name="Open Log Folder Button - Opens the folder containing application logs"/>
+                </StackPanel>
+            </GroupBox>
+            
             <!-- Preview Section -->
             <GroupBox Header="Preview" Padding="10" AutomationProperties.Name="Settings Preview Group" Margin="0,0,0,15">
                 <Border Background="White" BorderBrush="Gray" BorderThickness="1" Padding="20">

@@ -26,21 +26,62 @@ namespace BearsAdaClock
 
         public MainWindow()
         {
-            InitializeComponent();
-            LoadSettings();
-            InitializeTimer();
-            UpdateDisplay();
-            this.Loaded += MainWindow_Loaded;
-            InitializeStartupSetting();
+            Logger.Info("MainWindow constructor started");
+            
+            try
+            {
+                InitializeComponent();
+                Logger.Info("InitializeComponent completed");
+                
+                LoadSettings();
+                Logger.Info("Settings loaded");
+                
+                InitializeTimer();
+                Logger.Info("Timer initialized");
+                
+                UpdateDisplay();
+                Logger.Info("Display updated");
+                
+                this.Loaded += MainWindow_Loaded;
+                InitializeStartupSetting();
+                Logger.Info("Startup setting initialized");
+                
+                Logger.Info("MainWindow constructor completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("MainWindow constructor failed", ex);
+                throw;
+            }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            PositionWindow();
-            // Ensure timer is running after window is fully loaded
-            if (timer != null && !timer.IsEnabled)
+            Logger.Info("MainWindow_Loaded event fired");
+            
+            try
             {
-                timer.Start();
+                PositionWindow();
+                Logger.Info($"Window positioned at Left={this.Left}, Top={this.Top}");
+                
+                // Ensure timer is running after window is fully loaded
+                if (timer != null && !timer.IsEnabled)
+                {
+                    timer.Start();
+                    Logger.Info("Timer started");
+                }
+                else if (timer == null)
+                {
+                    Logger.Warning("Timer is null in MainWindow_Loaded");
+                }
+                else
+                {
+                    Logger.Info("Timer already running");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("MainWindow_Loaded failed", ex);
             }
         }
 
@@ -118,18 +159,23 @@ namespace BearsAdaClock
         {
             try
             {
+                Logger.Info("Creating DispatcherTimer");
                 timer = new DispatcherTimer();
                 timer.Interval = TimeSpan.FromSeconds(1);
                 timer.Tick += Timer_Tick;
                 timer.Start();
+                Logger.Info("Timer started successfully");
             }
             catch (Exception ex)
             {
-                // Log the error and try to reinitialize after a delay
+                Logger.Error("Timer initialization failed", ex);
                 System.Diagnostics.Debug.WriteLine($"Timer initialization failed: {ex.Message}");
+                
+                // Try to reinitialize after a delay
                 this.Dispatcher.BeginInvoke(new Action(() => {
                     try
                     {
+                        Logger.Info("Attempting to reinitialize timer");
                         if (timer == null)
                         {
                             timer = new DispatcherTimer();
@@ -139,9 +185,13 @@ namespace BearsAdaClock
                         if (!timer.IsEnabled)
                         {
                             timer.Start();
+                            Logger.Info("Timer reinitialized successfully");
                         }
                     }
-                    catch { }
+                    catch (Exception retryEx)
+                    {
+                        Logger.Error("Timer reinitialization failed", retryEx);
+                    }
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
@@ -150,7 +200,12 @@ namespace BearsAdaClock
         {
             try
             {
+                Logger.Info("Positioning window");
                 var workingArea = SystemParameters.WorkArea;
+                Logger.Info($"Working area: Left={workingArea.Left}, Top={workingArea.Top}, Right={workingArea.Right}, Bottom={workingArea.Bottom}");
+                Logger.Info($"Saved position: Left={Settings.Default.WindowLeft}, Top={Settings.Default.WindowTop}");
+                Logger.Info($"Window actual size: Width={this.ActualWidth}, Height={this.ActualHeight}");
+                
                 if (Settings.Default.WindowLeft >= 0 && Settings.Default.WindowTop >= 0)
                 {
                     if (Settings.Default.WindowLeft >= workingArea.Left &&
@@ -160,15 +215,27 @@ namespace BearsAdaClock
                     {
                         this.Left = Settings.Default.WindowLeft;
                         this.Top = Settings.Default.WindowTop;
+                        Logger.Info("Using saved window position");
                         return;
                     }
+                    else
+                    {
+                        Logger.Warning("Saved position is outside working area, using default position");
+                    }
                 }
+                else
+                {
+                    Logger.Info("No saved position found, using default position");
+                }
+                
                 this.Left = workingArea.Right - this.ActualWidth - 64;
                 this.Top = workingArea.Top + 64;
+                Logger.Info($"Set default position: Left={this.Left}, Top={this.Top}");
                 SaveSettings();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.Error("Error positioning window, using center screen", ex);
                 this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
         }
@@ -271,12 +338,32 @@ namespace BearsAdaClock
 
         private void Window_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            ClockContextMenu.IsOpen = true;
+            Logger.Info("Window right-click detected");
+            try
+            {
+                ClockContextMenu.IsOpen = true;
+                e.Handled = true;
+                Logger.Info("Context menu opened from window");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to open context menu from window", ex);
+            }
         }
 
         private void Grid_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            ClockContextMenu.IsOpen = true;
+            Logger.Info("Grid right-click detected");
+            try
+            {
+                ClockContextMenu.IsOpen = true;
+                e.Handled = true;
+                Logger.Info("Context menu opened from grid");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Failed to open context menu from grid", ex);
+            }
         }
 
         private void Settings_Click(object sender, RoutedEventArgs e)
@@ -292,24 +379,77 @@ namespace BearsAdaClock
         {
             try
             {
+                Logger.Info("Opening settings folder");
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string n6rejPath = Path.Combine(appData, "N6REJ");
                 string[] dirs = Directory.GetDirectories(n6rejPath, "*BearsAdaClock*");
                 if (dirs.Length > 0)
+                {
                     System.Diagnostics.Process.Start("explorer.exe", dirs[0]);
+                    Logger.Info($"Opened settings folder: {dirs[0]}");
+                }
                 else
+                {
+                    Logger.Warning("No settings folder found");
                     MessageBox.Show("No settings folder found in AppData.", "Show Settings Folder", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex)
             {
+                Logger.Error("Error opening settings folder", ex);
                 MessageBox.Show($"Error opening settings folder: {ex.Message}", "Show Settings Folder", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ShowLogsFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Logger.Info("Opening logs folder");
+                string logDirectory = Logger.GetLogDirectory();
+                
+                if (Directory.Exists(logDirectory))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", logDirectory);
+                    Logger.Info($"Opened logs folder: {logDirectory}");
+                }
+                else
+                {
+                    // Create the directory if it doesn't exist
+                    Directory.CreateDirectory(logDirectory);
+                    System.Diagnostics.Process.Start("explorer.exe", logDirectory);
+                    Logger.Info($"Created and opened logs folder: {logDirectory}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Error opening logs folder", ex);
+                MessageBox.Show($"Error opening logs folder: {ex.Message}\n\nLog path: {Logger.GetLogDirectory()}", 
+                    "Show Logs Folder", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
-            SaveSettings();
-            Application.Current.Shutdown();
+            Logger.Info("Application exit requested by user");
+            
+            // Add confirmation to prevent accidental exits
+            var result = MessageBox.Show(
+                "Are you sure you want to exit Bears ADA Clock?",
+                "Confirm Exit",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            
+            if (result == MessageBoxResult.Yes)
+            {
+                Logger.Info("Exit confirmed by user");
+                SaveSettings();
+                Application.Current.Shutdown();
+            }
+            else
+            {
+                Logger.Info("Exit cancelled by user");
+            }
         }
 
         public void ApplySettings()

@@ -18,6 +18,7 @@
         <ContextMenu x:Name="ClockContextMenu" AutomationProperties.Name="Clock Settings Menu">
             <MenuItem Header="Settings" Click="Settings_Click" AutomationProperties.Name="Open Settings"/>
             <MenuItem Header="Show Settings Folder" Click="ShowSettingsFolder_Click" AutomationProperties.Name="Show Settings Folder"/>
+            <MenuItem Header="Show Logs Folder" Click="ShowLogsFolder_Click" AutomationProperties.Name="Show Logs Folder"/>
             <Separator/>
             <MenuItem Header="Exit" Click="Exit_Click" AutomationProperties.Name="Exit Application"/>
         </ContextMenu>

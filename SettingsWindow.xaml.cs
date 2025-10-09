@@ -56,6 +56,9 @@ namespace BearsAdaClock
             // Load startup setting
             StartWithWindowsCheckBox.IsChecked = IsStartupEnabled();
             
+            // Load logging setting
+            EnableLoggingCheckBox.IsChecked = Settings.Default.EnableLogging;
+            
             // Update value displays
             DigitSizeValue.Text = $"{mainWindow.DigitSize:F0}px";
             DateSizeValue.Text = $"{mainWindow.DateSize:F0}px";
@@ -445,6 +448,69 @@ namespace BearsAdaClock
             catch (Exception ex)
             {
                 throw new Exception($"Unable to remove from startup: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Logging Management
+
+        private void EnableLoggingCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            bool isChecked = EnableLoggingCheckBox.IsChecked == true;
+            
+            try
+            {
+                // Save logging setting
+                Settings.Default.EnableLogging = isChecked;
+                Settings.Default.Save();
+                
+                // Log the change
+                if (isChecked)
+                {
+                    Logger.Info("Logging has been enabled");
+                }
+                else
+                {
+                    Logger.Info("Logging has been disabled");
+                }
+                
+                // Announce change to screen readers
+                AutomationProperties.SetName(EnableLoggingCheckBox, 
+                    $"Enable Logging Checkbox - Currently {(isChecked ? "enabled" : "disabled")}");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to update logging setting: {ex.Message}", 
+                              "Logging Setting Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                
+                // Revert checkbox state on error
+                EnableLoggingCheckBox.IsChecked = !isChecked;
+            }
+        }
+
+        private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string logDirectory = Logger.GetLogDirectory();
+                
+                // Create directory if it doesn't exist
+                if (!Directory.Exists(logDirectory))
+                {
+                    Directory.CreateDirectory(logDirectory);
+                }
+                
+                // Open the log folder in Windows Explorer
+                System.Diagnostics.Process.Start("explorer.exe", logDirectory);
+                
+                Logger.Info("Log folder opened from settings");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open log folder: {ex.Message}", 
+                              "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                Logger.Error("Failed to open log folder", ex);
             }
         }
 
