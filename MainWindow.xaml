@@ -15,9 +15,12 @@
         AutomationProperties.Name="Bears ADA Clock - Accessible Desktop Clock">
     
     <Window.ContextMenu>
-        <ContextMenu x:Name="ClockContextMenu" AutomationProperties.Name="Clock Settings Menu">
+        <ContextMenu x:Name="ClockContextMenu" AutomationProperties.Name="Clock Settings Menu" Opened="ClockContextMenu_Opened">
             <MenuItem Header="Settings" Click="Settings_Click" AutomationProperties.Name="Open Settings"/>
             <MenuItem Header="Show Settings Folder" Click="ShowSettingsFolder_Click" AutomationProperties.Name="Show Settings Folder"/>
+            <MenuItem Header="Show Logs Folder" Click="ShowLogsFolder_Click" AutomationProperties.Name="Show Logs Folder"/>
+            <Separator/>
+            <MenuItem x:Name="StartWithWindowsMenu" Header="Start with Windows" IsCheckable="True" Click="StartWithWindowsMenu_Click" AutomationProperties.Name="Start with Windows Toggle"/>
             <Separator/>
             <MenuItem Header="Exit" Click="Exit_Click" AutomationProperties.Name="Exit Application"/>
         </ContextMenu>

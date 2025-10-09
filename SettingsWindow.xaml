@@ -16,8 +16,15 @@
                        FontSize="24" 
                        FontWeight="Bold" 
                        HorizontalAlignment="Center"
-                       Margin="0,0,0,20"
+                       Margin="0,0,0,0"
                        AutomationProperties.Name="Settings Window Title"/>
+            <TextBlock x:Name="VersionText"
+                       Text="Version"
+                       FontSize="12"
+                       Foreground="Gray"
+                       HorizontalAlignment="Center"
+                       Margin="0,4,0,20"
+                       AutomationProperties.Name="Application Version"/>
             
             <!-- Digit Size Settings -->
             <GroupBox Header="Time Display Settings" Padding="10" AutomationProperties.Name="Time Display Settings Group" Margin="0,0,0,15">

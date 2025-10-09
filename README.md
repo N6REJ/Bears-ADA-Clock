@@ -119,6 +119,32 @@ A desktop clock specifically designed for those with accessibility issues, featu
 - **Clean Uninstall**: Complete removal of all files and registry entries
 - **Shared Runtime**: Benefits from shared .NET runtime (faster startup, security updates)
 
+## Logs
+
+Where to find the log file(s):
+- Primary: %LocalAppData%\BearsAdaClock\logs\ada-clock.log
+- Fallback (if LocalAppData is unavailable): %TEMP%\ada-clock.log
+
+Quick access:
+- Right-click the clock and choose "Show Logs Folder" to open the exact folder the app is using.
+
+Notes:
+- On startup, the app writes an entry like "Logger path in use: C:\\Users\\<You>\\AppData\\Local\\BearsAdaClock\\logs\\ada-clock.log" near the top of the log. This confirms the active path after any reinstall or Windows restart.
+
+What gets logged:
+- App lifecycle: startup, activation, exit
+- Window: construction, loaded, content rendered, positioning decisions
+- Settings: load/save, upgrade, apply
+- Context menu: open state, Start with Windows toggle
+- Registry operations for autostart (Run and StartupApproved keys)
+- Unhandled exceptions from AppDomain, Dispatcher, and TaskScheduler
+
+Log rotation:
+- The log file automatically rotates at ~1 MB into timestamped archives, keeping the current file small.
+
+Troubleshooting startup visibility:
+- If Windows shows the app in Startup Apps but no UI appears, check the log around "App.OnStartup" and "MainWindow constructor" entries for errors or immediate shutdown.
+
 ## Usage
 
 ### Basic Operation
@@ -149,6 +175,7 @@ The settings window provides comprehensive customization:
    - Toggle "Start with Windows" to automatically launch the clock at login
    - Enabled by default for convenience
    - Automatically configures Windows startup registry entries
+   - You can also toggle this from the clock's right-click context menu (Start with Windows)
 
 5. **Preview Section**:
    - See exactly how your settings will look
@@ -237,3 +264,41 @@ This project is open source under the MIT License. See LICENSE file for details.
 Contributions are welcome, especially those that improve accessibility features. Please ensure all new features maintain full screen reader compatibility.
 
 For support and updates, visit: https://hallhome.us/software
+
+## Exact log path explained
+
+- %LocalAppData% is a Windows environment variable that expands to: C:\Users\<YourUser>\AppData\Local
+- Therefore, the full log file path is: C:\Users\<YourUser>\AppData\Local\BearsAdaClock\logs\ada-clock.log
+- Replace <YourUser> with your Windows account name. Example: C:\Users\Troy\AppData\Local\BearsAdaClock\logs\ada-clock.log
+- Quick ways to open the folder:
+  - Press Win+R, paste: %LocalAppData%\BearsAdaClock\logs and press Enter
+  - In the app, right-click the clock and choose: Show Logs Folder
+- On startup the app logs a confirmation line near the top: "Logger path in use: C:\\Users\\<YourUser>\\AppData\\Local\\BearsAdaClock\\logs\\ada-clock.log"
+  - The same resolved path is exposed programmatically as: Logger.LogFilePath
+
+
+
+## Installer notes for .NET 6 and dependency warnings
+
+- When building the MSI via the Visual Studio Installer Projects extension, you may see warnings like:
+  - WARNING: Unable to find dependency 'SYSTEM.CONFIGURATION.CONFIGURATIONMANAGER' ...
+  - WARNING: Unable to find dependency 'MICROSOFT.WIN32.REGISTRY' ...
+  - WARNING: Unable to find dependency 'SYSTEM.DIAGNOSTICS.PROCESS' ...
+  - WARNING: Unable to find dependency 'SYSTEM.RUNTIME' ...
+- These are expected for .NET 6/7 apps packaged as framework-dependent. Those assemblies are part of the shared .NET runtime and do not ship as separate files next to your app. The installer still packages the correct .NET 6 artifacts (BearsAdaClock.exe, BearsAdaClock.dll, BearsAdaClock.deps.json, BearsAdaClock.runtimeconfig.json, fonts, and assets). The MSI build will succeed and the app will run provided the .NET 6 Desktop Runtime is installed on the target machine.
+
+What we changed
+- The Installer project now sources application files from the publish output folder: bin\Release\net6.0-windows\win-x64\publish. This is the recommended input for MSI packaging.
+- The legacy .NET Framework 4.7.2 launch condition was removed to avoid mixed prerequisites for a .NET 6 application.
+
+Eliminating the warnings (optional)
+- Best option: publish self-contained so all dependencies live next to the EXE. Then build the Installer (it already points at the publish folder) and the dependency warnings should disappear.
+
+How to publish self-contained (win-x64)
+- Visual Studio: Right-click project → Publish → New profile → Folder → Target runtime: win-x64 → Deployment mode: Self-contained → Finish → Publish.
+- CLI:
+  - dotnet publish -c Release -r win-x64 --self-contained true
+  - Output will be in bin\Release\net6.0-windows\win-x64\publish
+
+Notes
+- If you keep framework-dependent publish, the warnings may still appear, but they are benign; ensure .NET 6 Desktop Runtime is present on target machines.
