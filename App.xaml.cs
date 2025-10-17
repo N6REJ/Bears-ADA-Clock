@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using BearsAdaClock.Properties;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace BearsAdaClock
 {
@@ -17,6 +19,32 @@ namespace BearsAdaClock
 
             Logger.Info($"App.OnStartup - args='{string.Join(" ", e.Args ?? Array.Empty<string>())}', workingDir='{Environment.CurrentDirectory}', user='{Environment.UserName}'");
             Logger.Info($"Logger path in use: {Logger.LogFilePath}");
+
+            // Log application version being used
+            try
+            {
+                string version = null;
+                string exe = Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(exe))
+                {
+                    var fvi = FileVersionInfo.GetVersionInfo(exe);
+                    if (!string.IsNullOrWhiteSpace(fvi.FileVersion))
+                        version = fvi.FileVersion;
+                    else if (!string.IsNullOrWhiteSpace(fvi.ProductVersion))
+                        version = fvi.ProductVersion;
+                }
+                if (string.IsNullOrWhiteSpace(version))
+                {
+                    var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+                    version = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                              ?? asm.GetName().Version?.ToString();
+                }
+                Logger.Info($"Application version: {version ?? "unknown"}");
+            }
+            catch (Exception vex)
+            {
+                Logger.Error(vex, "Failed to resolve application version during startup");
+            }
 
             base.OnStartup(e);
             
