@@ -3,7 +3,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Reflection;
-using System.Runtime.InteropServices;
 
 namespace BearsAdaClock
 {
@@ -11,83 +10,89 @@ namespace BearsAdaClock
     {
         private const string RUN_REGISTRY_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string STARTUP_APPROVED_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
-        private const string APP_NAME = "BearsAdaClock";
+        private const string STARTUP_APPROVED_STARTUPFOLDER_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
+        private const string APP_NAME = "BearsAdaClock"; // Keep stable value name for Run and StartupApproved
+        private const string APP_SHORTCUT_NAME = "BearsAdaClock.lnk";
 
-        // Prefer Startup folder shortcut like other working projects; keep registry fallback for compatibility
         public static void SetStartup(bool enabled)
         {
             try
             {
                 string exePath = GetExecutablePath();
-                string shortcutPath = GetStartupShortcutPath();
-
-                Log($"SetStartup(enabled={enabled}) exePath='{exePath}' shortcutPath='{shortcutPath}'");
 
                 using (RegistryKey runKey = Registry.CurrentUser.CreateSubKey(RUN_REGISTRY_PATH, true))
-                using (RegistryKey approvedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
+                using (RegistryKey approvedRunKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
+                using (RegistryKey approvedStartupFolderKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_STARTUPFOLDER_PATH, true))
                 {
                     if (enabled)
                     {
-                        // Try to create the Startup shortcut first
-                        bool shortcutCreated = TryCreateStartupShortcut(shortcutPath, exePath);
-                        Log($"TryCreateStartupShortcut => {shortcutCreated} existsAfter={File.Exists(shortcutPath)}");
+                        // Write/refresh the Run key value
+                        runKey?.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
 
-                        if (shortcutCreated)
-                        {
-                            // Shortcut created successfully: clean any stale Run/StartupApproved entries
-                            try { if (runKey?.GetValue(APP_NAME) != null) { runKey.DeleteValue(APP_NAME, false); Log("Deleted stale Run entry"); } } catch (Exception ex) { Log("Delete Run entry failed: " + ex.Message); }
-                            try { if (approvedKey?.GetValue(APP_NAME) != null) { approvedKey.DeleteValue(APP_NAME, false); Log("Deleted stale StartupApproved entry"); } } catch (Exception ex) { Log("Delete StartupApproved failed: " + ex.Message); }
-                        }
-                        else
-                        {
-                            // Shortcut creation failed: ensure Run key is set as a reliable fallback
-                            try
-                            {
-                                runKey?.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
-                                Log("Set HKCU Run fallback to '" + exePath + "'");
-                            }
-                            catch (Exception ex)
-                            {
-                                Log("Failed to set Run fallback: " + ex.Message);
-                            }
+                        // Create/refresh Startup folder shortcut
+                        try { CreateStartupShortcut(exePath); } catch { }
 
-                            // Clear any disabled marker so Windows will launch it
-                            try
-                            {
-                                if (approvedKey?.GetValue(APP_NAME) != null) { approvedKey.DeleteValue(APP_NAME, false); Log("Cleared StartupApproved disabled marker"); }
-                            }
-                            catch (Exception ex)
-                            {
-                                Log("Failed to clear StartupApproved: " + ex.Message);
-                            }
+                        // Also create/update a per-user Scheduled Task as a reliable fallback with a short delay
+                        try { TryCreateScheduledTask(exePath, 10); } catch { }
+
+                        // Mark as enabled in StartupApproved (Run)
+                        try
+                        {
+                            byte[] enabledValue = new byte[12];
+                            enabledValue[0] = 0x02; // enabled
+                            approvedRunKey?.SetValue(APP_NAME, enabledValue, RegistryValueKind.Binary);
                         }
+                        catch { }
+
+                        // Mark as enabled in StartupApproved (StartupFolder)
+                        try
+                        {
+                            byte[] enabledValue = new byte[12];
+                            enabledValue[0] = 0x02; // enabled
+                            approvedStartupFolderKey?.SetValue(APP_SHORTCUT_NAME, enabledValue, RegistryValueKind.Binary);
+                        }
+                        catch { }
                     }
                     else
                     {
-                        // Disable autostart: remove shortcut and Run entry, and mark disabled for UI
-                        DeleteStartupShortcut(shortcutPath);
-                        Log("Deleted shortcut if existed");
+                        // Remove the Run key value
+                        try
+                        {
+                            if (runKey?.GetValue(APP_NAME) != null)
+                            {
+                                runKey.DeleteValue(APP_NAME, false);
+                            }
+                        }
+                        catch { }
 
-                        try { if (runKey?.GetValue(APP_NAME) != null) { runKey.DeleteValue(APP_NAME, false); Log("Deleted Run entry"); } } catch (Exception ex) { Log("Delete Run failed: " + ex.Message); }
+                        // Delete Startup folder shortcut
+                        try { DeleteStartupShortcut(); } catch { }
 
-                        // Mark as disabled in StartupApproved so Windows reflects state in Startup Apps UI
+                        // Delete per-user scheduled task if present
+                        try { TryDeleteScheduledTask(); } catch { }
+
+                        // Mark as disabled in StartupApproved (Run)
                         try
                         {
                             byte[] disabled = new byte[12];
-                            disabled[0] = 0x03; // 0x03 indicates disabled
-                            approvedKey?.SetValue(APP_NAME, disabled, RegistryValueKind.Binary);
-                            Log("Wrote StartupApproved disabled marker");
+                            disabled[0] = 0x03; // disabled
+                            approvedRunKey?.SetValue(APP_NAME, disabled, RegistryValueKind.Binary);
                         }
-                        catch (Exception ex)
+                        catch { }
+
+                        // Mark as disabled in StartupApproved (StartupFolder)
+                        try
                         {
-                            Log("Failed to write StartupApproved disabled marker: " + ex.Message);
+                            byte[] disabled = new byte[12];
+                            disabled[0] = 0x03; // disabled
+                            approvedStartupFolderKey?.SetValue(APP_SHORTCUT_NAME, disabled, RegistryValueKind.Binary);
                         }
+                        catch { }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Log("SetStartup fatal error: " + ex);
                 throw new Exception($"Failed to {(enabled ? "enable" : "disable")} startup: {ex.Message}");
             }
         }
@@ -96,237 +101,228 @@ namespace BearsAdaClock
         {
             try
             {
-                bool hasShortcut = File.Exists(GetStartupShortcutPath());
-
-                // Backward compatibility with existing Run key entries
-                bool hasValidRunEntry = false;
-                bool isDisabledByApproval = false;
-                string? runRaw = null;
-                string? runExe = null;
+                bool hasRunEntry = false;
+                bool runDisabledByApproval = false;
+                bool hasStartupShortcut = false;
+                bool folderDisabledByApproval = false;
 
                 using (RegistryKey runKey = Registry.CurrentUser.OpenSubKey(RUN_REGISTRY_PATH, false))
                 {
-                    object? val = runKey?.GetValue(APP_NAME);
-                    runRaw = val as string;
-                    runExe = ExtractExeFromRunValue(runRaw);
-                    if (!string.IsNullOrWhiteSpace(runExe))
-                    {
-                        hasValidRunEntry = File.Exists(runExe);
-                    }
+                    hasRunEntry = runKey?.GetValue(APP_NAME) != null;
                 }
 
-                using (RegistryKey approvedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
+                using (RegistryKey approvedRun = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
                 {
-                    var val = approvedKey?.GetValue(APP_NAME) as byte[];
+                    var val = approvedRun?.GetValue(APP_NAME) as byte[];
                     if (val != null && val.Length > 0)
                     {
                         // First byte: 0x02 = enabled, 0x03 = disabled
-                        isDisabledByApproval = val[0] == 0x03;
+                        runDisabledByApproval = val[0] == 0x03;
                     }
                 }
 
-                bool enabled = hasShortcut || (hasValidRunEntry && !isDisabledByApproval);
-                Log($"IsStartupEnabled => {enabled} hasShortcut={hasShortcut} hasValidRunEntry={hasValidRunEntry} runRaw='{runRaw}' runExe='{runExe}' disabledByApproval={isDisabledByApproval}");
-                return enabled;
+                // Startup folder
+                string shortcut = GetStartupShortcutPath();
+                hasStartupShortcut = !string.IsNullOrEmpty(shortcut) && File.Exists(shortcut);
+                using (RegistryKey approvedFolder = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_STARTUPFOLDER_PATH, false))
+                {
+                    var val = approvedFolder?.GetValue(APP_SHORTCUT_NAME) as byte[];
+                    if (val != null && val.Length > 0)
+                    {
+                        folderDisabledByApproval = val[0] == 0x03;
+                    }
+                }
+
+                // Check scheduled task presence as an additional reliable mechanism
+                bool hasSchedTask = false;
+                try { hasSchedTask = IsScheduledTaskPresentAndEnabled(); } catch { }
+
+                return (hasRunEntry && !runDisabledByApproval)
+                       || (hasStartupShortcut && !folderDisabledByApproval)
+                       || hasSchedTask;
             }
-            catch (Exception ex)
+            catch
             {
-                Log("IsStartupEnabled error: " + ex.Message);
                 return false;
             }
         }
 
-        private static string? ExtractExeFromRunValue(string? value)
+        private static string GetStartupShortcutPath()
         {
-            if (string.IsNullOrWhiteSpace(value)) return null;
-            string s = value.Trim();
             try
             {
-                if (s.StartsWith("\""))
-                {
-                    int end = s.IndexOf('"', 1);
-                    if (end > 1)
-                        return s.Substring(1, end - 1);
-                }
-                int space = s.IndexOf(' ');
-                return space > 0 ? s.Substring(0, space) : s;
+                string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                if (string.IsNullOrEmpty(startupFolder)) return null;
+                return Path.Combine(startupFolder, APP_SHORTCUT_NAME);
             }
             catch { return null; }
         }
 
-        private static string GetStartupShortcutPath()
+        private static void CreateStartupShortcut(string exePath)
         {
-            string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-            return Path.Combine(startupFolder, APP_NAME + ".lnk");
+            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath)) return;
+            string shortcutPath = GetStartupShortcutPath();
+            if (string.IsNullOrEmpty(shortcutPath)) return;
+
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return;
+                dynamic shell = Activator.CreateInstance(shellType);
+                dynamic shortcut = shell.CreateShortcut(shortcutPath);
+                shortcut.TargetPath = exePath;
+                shortcut.WorkingDirectory = Path.GetDirectoryName(exePath);
+                shortcut.IconLocation = exePath;
+                shortcut.Description = "Bears ADA Clock";
+                shortcut.Save();
+            }
+            catch { }
         }
 
-        private static bool TryCreateStartupShortcut(string shortcutPath, string exePath)
-        {
-            try { Directory.CreateDirectory(Path.GetDirectoryName(shortcutPath)!); } catch (Exception ex) { Log("CreateDirectory failed: " + ex.Message); }
-
-            // Try robust ShellLink COM first (works even if Windows Script Host is disabled)
-            try
-            {
-                var link = (IShellLinkW)new CShellLink();
-                link.SetPath(exePath);
-                link.SetWorkingDirectory(Path.GetDirectoryName(exePath));
-                link.SetShowCmd(1); // SW_SHOWNORMAL
-                link.SetDescription("Bears ADA Clock");
-                link.SetIconLocation(exePath, 0);
-
-                var pf = (IPersistFile)link;
-                pf.Save(shortcutPath, true);
-
-                bool exists = File.Exists(shortcutPath);
-                Log("ShellLink save => exists=" + exists);
-                return exists;
-            }
-            catch (Exception ex)
-            {
-                Log("ShellLink creation failed: " + ex.Message);
-            }
-
-            // Fallback to WScript.Shell if ShellLink failed
-            try
-            {
-                Type? shellType = Type.GetTypeFromProgID("WScript.Shell");
-                if (shellType == null)
-                {
-                    Log("WScript.Shell not available");
-                }
-                else
-                {
-                    dynamic shell = Activator.CreateInstance(shellType)!;
-                    dynamic lnk = shell.CreateShortcut(shortcutPath);
-                    lnk.TargetPath = exePath;
-                    lnk.WorkingDirectory = Path.GetDirectoryName(exePath);
-                    lnk.WindowStyle = 1;
-                    lnk.Description = "Bears ADA Clock";
-                    lnk.IconLocation = exePath + ",0";
-                    lnk.Save();
-                    bool exists = File.Exists(shortcutPath);
-                    Log("WScript.Shell save => exists=" + exists);
-                    return exists;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log("WScript.Shell creation failed: " + ex.Message);
-            }
-
-            return false;
-        }
-
-        private static void DeleteStartupShortcut(string shortcutPath)
+        private static void DeleteStartupShortcut()
         {
             try
             {
-                if (File.Exists(shortcutPath))
+                string shortcutPath = GetStartupShortcutPath();
+                if (!string.IsNullOrEmpty(shortcutPath) && File.Exists(shortcutPath))
                 {
                     File.Delete(shortcutPath);
                 }
             }
-            catch (Exception ex) { Log("Delete shortcut failed: " + ex.Message); }
+            catch { }
         }
 
         private static string GetExecutablePath()
         {
             try
             {
-                // First try to get the main module file name (works for both single-file and regular deployments)
+                // Prefer the actual running process executable
                 string processPath = Process.GetCurrentProcess().MainModule?.FileName;
-                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
+                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                     return processPath;
-                
-                // For single-file apps, use AppContext.BaseDirectory
+
+                // Try common locations relative to base directory
                 string baseDirectory = AppContext.BaseDirectory;
-                string exePath = Path.Combine(baseDirectory, "BearsAdaClock.exe");
-                if (File.Exists(exePath))
-                    return exePath;
-                
-                // Fallback to assembly location (for non-single-file deployments)
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
-                if (!string.IsNullOrEmpty(assemblyPath))
+                if (!string.IsNullOrEmpty(baseDirectory))
                 {
-                    if (assemblyPath.EndsWith(".dll"))
+                    // Try BearsAdaClock.exe by convention
+                    string exePath = Path.Combine(baseDirectory, "BearsAdaClock.exe");
+                    if (File.Exists(exePath))
+                        return exePath;
+
+                    // Try using entry assembly name
+                    var entry = Assembly.GetEntryAssembly();
+                    if (entry != null)
                     {
-                        string dllExePath = Path.ChangeExtension(assemblyPath, ".exe");
-                        if (File.Exists(dllExePath)) return dllExePath;
-                        string directory = Path.GetDirectoryName(assemblyPath);
-                        string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                        string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                        if (File.Exists(potentialExePath)) return potentialExePath;
-                        string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
-                        if (File.Exists(clockExePath)) return clockExePath;
+                        string name = entry.GetName().Name + ".exe";
+                        string candidate = Path.Combine(baseDirectory, name);
+                        if (File.Exists(candidate)) return candidate;
                     }
-                    return assemblyPath;
                 }
-                
-                // Final fallback - use the process path or base directory
-                return processPath ?? baseDirectory;
+
+
+                // As last resort, return the base directory (unlikely to work) only if processPath is null
+                return !string.IsNullOrEmpty(processPath) ? processPath : baseDirectory;
             }
-            catch (Exception ex)
-            { 
-                Log("GetExecutablePath error: " + ex.Message);
-                return AppContext.BaseDirectory; 
+            catch
+            {
+                // Final fallback to process path if available
+                try
+                {
+                    string p = Process.GetCurrentProcess().MainModule?.FileName;
+                    if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+                }
+                catch { }
+                return AppContext.BaseDirectory;
             }
         }
+    }
+}
 
-        private static void Log(string message)
+
+        private static void TryCreateScheduledTask(string exePath, int delaySeconds)
         {
+            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath)) return;
             try
             {
-                string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "N6REJ", "BearsAdaClock", "logs");
-                Directory.CreateDirectory(root);
-                string path = Path.Combine(root, "autostart.log");
-                string line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + " " + message + Environment.NewLine;
-                File.AppendAllText(path, line);
+                // schtasks per-user creation without password; delay helps avoid logon race conditions
+                string taskName = APP_NAME; // keep consistent branding
+                int d = Math.Max(0, Math.Min(delaySeconds, 300));
+                string delay = $"{(d/60):D2}:{(d%60):D2}"; // mm:ss
+
+                // If task exists, delete first to ensure it updates cleanly
+                TryDeleteScheduledTask();
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    Arguments = $"/Create /TN \"{taskName}\" /SC ONLOGON /RL LIMITED /DELAY 0000:{delay} /TR \"\"{exePath}\"\" /F",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                using (var p = Process.Start(psi))
+                {
+                    p.WaitForExit(5000);
+                }
             }
             catch { }
         }
 
-        #region COM Interop for Shell Link
-        [ComImport]
-        [Guid("000214F9-0000-0000-C000-000000000046")]
-        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        private interface IShellLinkW
+        private static void TryDeleteScheduledTask()
         {
-            int GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszFile, int cchMaxPath, IntPtr pfd, int fFlags);
-            int GetIDList(out IntPtr ppidl);
-            int SetIDList(IntPtr pidl);
-            int GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszName, int cchMaxName);
-            int SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
-            int GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszDir, int cchMaxPath);
-            int SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
-            int GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszArgs, int cchMaxPath);
-            int SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
-            int GetHotkey(out short wHotkey);
-            int SetHotkey(short wHotkey);
-            int GetShowCmd(out int iShowCmd);
-            int SetShowCmd(int iShowCmd);
-            int GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszIconPath, int cchIconPath, out int iIcon);
-            int SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
-            int SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, int dwReserved);
-            int Resolve(IntPtr hwnd, int fFlags);
-            int SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
+            try
+            {
+                string taskName = APP_NAME;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    Arguments = $"/Delete /TN \"{taskName}\" /F",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                using (var p = Process.Start(psi))
+                {
+                    p.WaitForExit(4000);
+                }
+            }
+            catch { }
         }
 
-        [ComImport]
-        [Guid("0000010B-0000-0000-C000-000000000046")]
-        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        private interface IPersistFile
+        private static bool IsScheduledTaskPresentAndEnabled()
         {
-            int GetClassID(out Guid pClassID);
-            int IsDirty();
-            int Load([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, uint dwMode);
-            int Save([MarshalAs(UnmanagedType.LPWStr)] string pszFileName, bool fRemember);
-            int SaveCompleted([MarshalAs(UnmanagedType.LPWStr)] string pszFileName);
-            int GetCurFile([MarshalAs(UnmanagedType.LPWStr)] out string ppszFileName);
+            try
+            {
+                string taskName = APP_NAME;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    Arguments = $"/Query /TN \"{taskName}\" /FO LIST /V",
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                };
+                using (var p = Process.Start(psi))
+                {
+                    string output = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit(4000);
+                    if (p.ExitCode != 0) return false;
+                    if (string.IsNullOrEmpty(output)) return true; // exists but no detail; assume present
+                    // Look for Enabled: Yes or State: Ready/Queued
+                    bool enabled = output.IndexOf("Enabled:", StringComparison.OrdinalIgnoreCase) < 0 ||
+                                   output.IndexOf("Enabled:             Yes", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                   output.IndexOf("Enabled: Yes", StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool notDisabledState = output.IndexOf("State:", StringComparison.OrdinalIgnoreCase) < 0 ||
+                                            output.IndexOf("State:             Ready", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            output.IndexOf("State: Ready", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            output.IndexOf("State: Running", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                            output.IndexOf("State: Queued", StringComparison.OrdinalIgnoreCase) >= 0;
+                    return enabled && notDisabledState;
+                }
+            }
+            catch { return false; }
         }
-
-        [ComImport]
-        [Guid("00021401-0000-0000-C000-000000000046")]
-        private class CShellLink { }
-        #endregion
-    }
-}
