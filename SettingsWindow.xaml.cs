@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -19,21 +20,92 @@ namespace BearsAdaClock
             InitializeComponent();
             mainWindow = parent;
 
-            // Set version text from assembly file version
-            try
+            // Set version text robustly from executable and assembly metadata
+            string vt = GetVersionText();
+            Logger.Info($"SettingsWindow ctor resolved version text: '{vt}'");
+            VersionText.Text = vt;
+
+            // Backstop: ensure version is set again after the visual tree is loaded
+            this.Loaded += (s, e) =>
             {
-                var asm = Assembly.GetExecutingAssembly();
-                string? file = asm.Location;
-                string version = System.Diagnostics.FileVersionInfo.GetVersionInfo(file).FileVersion ?? asm.GetName().Version?.ToString() ?? "";
-                if (!string.IsNullOrWhiteSpace(version))
+                string vt2 = GetVersionText();
+                if (!string.Equals(VersionText.Text, vt2, StringComparison.Ordinal))
                 {
-                    VersionText.Text = $"Version {version}";
+                    Logger.Info($"SettingsWindow Loaded updated version text from '{VersionText.Text}' to '{vt2}'");
+                    VersionText.Text = vt2;
                 }
-            }
-            catch { }
+            };
 
             LoadCurrentSettings();
             UpdatePreview();
+        }
+
+        private string GetVersionText()
+        {
+            try
+            {
+                string version = ResolveVersion();
+                return string.IsNullOrWhiteSpace(version) ? "Version unknown" : $"Version {version}";
+            }
+            catch
+            {
+                return "Version unknown";
+            }
+        }
+
+        private string ResolveVersion()
+        {
+            try
+            {
+                // 1) From current process executable (only if it looks like our app, not dotnet host)
+                string exe = Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(exe) && File.Exists(exe))
+                {
+                    string exeName = System.IO.Path.GetFileName(exe);
+                    if (exeName != null && exeName.EndsWith("BearsAdaClock.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var fvi = FileVersionInfo.GetVersionInfo(exe);
+                        if (!string.IsNullOrWhiteSpace(fvi.FileVersion))
+                        {
+                            Logger.Info($"SettingsWindow.ResolveVersion from EXE FileVersion: '{fvi.FileVersion}' path='{exe}'");
+                            return fvi.FileVersion;
+                        }
+                        if (!string.IsNullOrWhiteSpace(fvi.ProductVersion))
+                        {
+                            Logger.Info($"SettingsWindow.ResolveVersion from EXE ProductVersion: '{fvi.ProductVersion}' path='{exe}'");
+                            return fvi.ProductVersion;
+                        }
+                    }
+                    else
+                    {
+                        Logger.Info($"SettingsWindow.ResolveVersion skipped host executable: '{exeName}' path='{exe}'");
+                    }
+                }
+
+                // 2) From entry assembly informational version
+                var asm = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
+                var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+                if (!string.IsNullOrWhiteSpace(info))
+                {
+                    Logger.Info($"SettingsWindow.ResolveVersion from AssemblyInformationalVersion: '{info}'");
+                    return info;
+                }
+
+                // 3) From assembly version
+                var av = asm.GetName().Version?.ToString();
+                if (!string.IsNullOrWhiteSpace(av))
+                {
+                    Logger.Info($"SettingsWindow.ResolveVersion from AssemblyVersion: '{av}'");
+                    return av;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "SettingsWindow.ResolveVersion failed");
+            }
+
+            Logger.Warning("SettingsWindow.ResolveVersion returned empty version");
+            return string.Empty;
         }
 
         private void LoadCurrentSettings()
