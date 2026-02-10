@@ -382,15 +382,14 @@ namespace BearsAdaClock
             {
                 bool isFirstRun = IsFirstRun();
                 Logger.Info($"InitializeStartupSetting - isFirstRun={isFirstRun}");
+                
+                // Always synchronize to ensure registry matches settings and path is correct
+                SynchronizeStartupSetting();
+
                 if (isFirstRun)
                 {
-                    EnableStartup();
-                    Logger.Info("InitializeStartupSetting - Enabled startup on first run.");
                     MarkAsRun();
-                }
-                else
-                {
-                    SynchronizeStartupSetting();
+                    Logger.Info("InitializeStartupSetting - Marked first run as completed.");
                 }
             }
             catch (Exception ex)
@@ -398,50 +397,73 @@ namespace BearsAdaClock
                 Logger.Error(ex, "InitializeStartupSetting failed");
             }
         }
+
         private void SynchronizeStartupSetting()
         {
             try
             {
-                bool registryStartupEnabled = IsStartupEnabledInRegistry();
                 bool settingsStartupEnabled = Settings.Default.StartWithWindows;
-                Logger.Info($"SynchronizeStartupSetting - registry={registryStartupEnabled}, settings={settingsStartupEnabled}");
-
-                // Enforce the user's stored preference. If they want it to start with Windows,
-                // recreate the Startup shortcut/Run entry if it was removed or disabled.
-                if (settingsStartupEnabled && !registryStartupEnabled)
+                string currentExecutablePath = RegistryHelper.GetExecutablePath();
+                string registryValue = GetStartupPathFromRegistry();
+                bool registryStartupEnabled = !string.IsNullOrEmpty(registryValue);
+                bool pathMatches = false;
+                
+                if (registryStartupEnabled)
                 {
-                    RegistryHelper.SetStartup(true);
-                    // Save remains true as per preference
-                    Settings.Default.StartWithWindows = true;
-                    Settings.Default.Save();
-                    Logger.Info("SynchronizeStartupSetting - Re-enabled autostart per settings.");
+                    // Registry values for 'Run' are often quoted and might have arguments
+                    string cleanRegistryPath = registryValue.Trim().Trim('\"');
+                    
+                    // If it contains arguments, strip them for the path comparison
+                    if (cleanRegistryPath.Contains(".exe\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                         // Case where it is like "C:\path\to.exe" --arg
+                         int exeIndex = cleanRegistryPath.IndexOf(".exe\"", StringComparison.OrdinalIgnoreCase);
+                         cleanRegistryPath = cleanRegistryPath.Substring(0, exeIndex + 4);
+                    }
+                    else if (cleanRegistryPath.Contains(".exe ", StringComparison.OrdinalIgnoreCase))
+                    {
+                         // Case where it is like C:\path\to.exe --arg (unquoted)
+                         int exeIndex = cleanRegistryPath.IndexOf(".exe ", StringComparison.OrdinalIgnoreCase);
+                         cleanRegistryPath = cleanRegistryPath.Substring(0, exeIndex + 4);
+                    }
+
+                    pathMatches = string.Equals(cleanRegistryPath, currentExecutablePath, StringComparison.OrdinalIgnoreCase);
                 }
-                // If the user disabled it in settings but registry still has it enabled, turn it off.
+
+                Logger.Info($"SynchronizeStartupSetting - registryEnabled={registryStartupEnabled}, pathMatches={pathMatches}, settingsEnabled={settingsStartupEnabled}, registryValue='{registryValue}'");
+
+                // If user wants startup but it's missing OR it's pointing to the wrong path
+                if (settingsStartupEnabled && (!registryStartupEnabled || !pathMatches))
+                {
+                    Logger.Info($"SynchronizeStartupSetting - Attempting to {(registryStartupEnabled ? "update" : "enable")} autostart. Current Registry Path: '{registryValue}', New Path: '{currentExecutablePath}'");
+                    RegistryHelper.SetStartup(true);
+                    Logger.Info($"SynchronizeStartupSetting - Success.");
+                }
+                // If user doesn't want startup but it's enabled in registry
                 else if (!settingsStartupEnabled && registryStartupEnabled)
                 {
                     RegistryHelper.SetStartup(false);
-                    Settings.Default.StartWithWindows = false;
-                    Settings.Default.Save();
                     Logger.Info("SynchronizeStartupSetting - Disabled autostart per settings.");
                 }
-                // If both match, nothing to do.
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "SynchronizeStartupSetting failed");
             }
         }
-        private bool IsStartupEnabledInRegistry()
+
+        private string GetStartupPathFromRegistry()
         {
             try
             {
                 using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
                 {
-                    return key?.GetValue("BearsAdaClock") != null;
+                    return key?.GetValue("BearsAdaClock") as string;
                 }
             }
-            catch { return false; }
+            catch { return null; }
         }
+
         private bool IsFirstRun()
         {
             try
@@ -453,6 +475,7 @@ namespace BearsAdaClock
             }
             catch { return true; }
         }
+
         private void MarkAsRun()
         {
             try
@@ -463,45 +486,6 @@ namespace BearsAdaClock
                 }
             }
             catch { }
-        }
-        private void EnableStartup()
-        {
-            try
-            {
-                string executablePath = GetExecutablePath();
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
-                }
-            }
-            catch { }
-        }
-        private string GetExecutablePath()
-        {
-            try
-            {
-                // Prefer the actual process main module path
-                string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                    return processPath;
-
-                // Then try AppContext.BaseDirectory with known exe names
-                string baseDir = AppContext.BaseDirectory;
-                if (!string.IsNullOrEmpty(baseDir))
-                {
-                    string clockExePath = Path.Combine(baseDir, "BearsAdaClock.exe");
-                    if (File.Exists(clockExePath)) return clockExePath;
-
-                    string procName = (System.Diagnostics.Process.GetCurrentProcess().ProcessName ?? "BearsAdaClock").Trim();
-                    if (!procName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) procName += ".exe";
-                    string byProcName = Path.Combine(baseDir, procName);
-                    if (File.Exists(byProcName)) return byProcName;
-                }
-
-                // Final fallback to base directory
-                return baseDir ?? string.Empty;
-            }
-            catch { return AppContext.BaseDirectory; }
         }
         #endregion
     }

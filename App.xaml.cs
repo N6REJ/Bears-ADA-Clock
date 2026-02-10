@@ -18,6 +18,7 @@ namespace BearsAdaClock
             TaskScheduler.UnobservedTaskException += (s, ex) => { Logger.Error(ex.Exception, "TaskScheduler.UnobservedTaskException"); ex.SetObserved(); };
 
             Logger.Info($"App.OnStartup - args='{string.Join(" ", e.Args ?? Array.Empty<string>())}', workingDir='{Environment.CurrentDirectory}', user='{Environment.UserName}'");
+            Logger.Info($"Process ID: {Environment.ProcessId}, Command Line: {Environment.CommandLine}");
             Logger.Info($"Logger path in use: {Logger.LogFilePath}");
 
             // Log application version being used
