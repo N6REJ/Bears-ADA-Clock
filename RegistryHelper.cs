@@ -33,9 +33,9 @@ namespace BearsAdaClock
 
                     if (enabled)
                     {
-                        // Add to startup - use quoted path to handle spaces
-                        key.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
-                        Logger.Info($"Added to startup: {exePath}");
+                        // Add to startup - use quoted path and add --autostart flag
+                        key.SetValue(APP_NAME, $"\"{exePath}\" --autostart", RegistryValueKind.String);
+                        Logger.Info($"Added to startup: {exePath} --autostart");
                     }
                     else
                     {
@@ -81,12 +81,13 @@ namespace BearsAdaClock
         /// <summary>
         /// Get the full path to the current executable.
         /// </summary>
-        private static string GetExecutablePath()
+        internal static string GetExecutablePath()
         {
             try
             {
-                // Get the actual running process executable path
-                string processPath = Process.GetCurrentProcess().MainModule?.FileName;
+                // Environment.ProcessPath is the most reliable way in .NET 6+ 
+                // to get the path of the executable that started the process.
+                string processPath = Environment.ProcessPath;
                 
                 if (!string.IsNullOrEmpty(processPath) && 
                     File.Exists(processPath) && 
@@ -95,13 +96,22 @@ namespace BearsAdaClock
                     return processPath;
                 }
 
-                // Fallback to base directory
+                // Fallback to MainModule for older .NET or specific scenarios
+                processPath = Process.GetCurrentProcess().MainModule?.FileName;
+                if (!string.IsNullOrEmpty(processPath) && 
+                    File.Exists(processPath) && 
+                    processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    return processPath;
+                }
+
+                // Final fallback to base directory
                 return Path.Combine(AppContext.BaseDirectory, "BearsAdaClock.exe");
             }
             catch (Exception ex)
             {
                 Logger.Error(ex, "Failed to get executable path");
-                return AppContext.BaseDirectory;
+                return Path.Combine(AppContext.BaseDirectory, "BearsAdaClock.exe");
             }
         }
     }
