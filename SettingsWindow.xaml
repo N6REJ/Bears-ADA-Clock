@@ -116,6 +116,49 @@
                         <ComboBoxItem Content="MMM DD, YYYY" Tag="MMM dd, yyyy"/>
                         <ComboBoxItem Content="DD MMM YYYY" Tag="dd MMM yyyy"/>
                     </ComboBox>
+
+                    <Label Content="Day of Week Size:" Target="{Binding ElementName=DayOfWeekSizeSlider}" AutomationProperties.Name="Day of Week Size Label" Margin="0,0,0,5"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <Slider x:Name="DayOfWeekSizeSlider" 
+                                Minimum="24" 
+                                Maximum="128" 
+                                TickFrequency="8" 
+                                IsSnapToTickEnabled="True"
+                                Width="300"
+                                Value="24"
+                                ValueChanged="DayOfWeekSizeSlider_ValueChanged"
+                                AutomationProperties.Name="Day of Week Size Slider - Range 24 to 128 pixels in 8 pixel increments"/>
+                        <TextBlock x:Name="DayOfWeekSizeValue" Text="24px" Width="50" VerticalAlignment="Center" Margin="10,0,0,0" AutomationProperties.Name="Current Day of Week Size Value"/>
+                    </StackPanel>
+
+                    <Label Content="Day of Week Color:" Target="{Binding ElementName=DayOfWeekColorCombo}" AutomationProperties.Name="Day of Week Color Label" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="DayOfWeekColorCombo" 
+                              Width="200" 
+                              HorizontalAlignment="Left"
+                              SelectionChanged="DayOfWeekColorCombo_SelectionChanged"
+                              AutomationProperties.Name="Day of Week Color Selection"
+                              Margin="0,0,0,10">
+                        <ComboBoxItem Content="Black" Tag="Black" IsSelected="True"/>
+                        <ComboBoxItem Content="White" Tag="White"/>
+                        <ComboBoxItem Content="Red" Tag="Red"/>
+                        <ComboBoxItem Content="Blue" Tag="Blue"/>
+                        <ComboBoxItem Content="Green" Tag="Green"/>
+                        <ComboBoxItem Content="Yellow" Tag="Yellow"/>
+                        <ComboBoxItem Content="Orange" Tag="Orange"/>
+                        <ComboBoxItem Content="Purple" Tag="Purple"/>
+                        <ComboBoxItem Content="Gray" Tag="Gray"/>
+                    </ComboBox>
+
+                    <Label Content="Day of Week Format:" Target="{Binding ElementName=DayOfWeekFormatCombo}" AutomationProperties.Name="Day of Week Format Label" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="DayOfWeekFormatCombo" 
+                              Width="200" 
+                              HorizontalAlignment="Left"
+                              SelectionChanged="DayOfWeekFormatCombo_SelectionChanged"
+                              AutomationProperties.Name="Day of Week Format Selection"
+                              Margin="0,0,0,10">
+                        <ComboBoxItem Content="Long (Monday)" Tag="dddd" IsSelected="True"/>
+                        <ComboBoxItem Content="Short (Mon)" Tag="ddd"/>
+                    </ComboBox>
                 </StackPanel>
             </GroupBox>
             
@@ -128,10 +171,11 @@
                               HorizontalAlignment="Left"
                               SelectionChanged="DisplayModeCombo_SelectionChanged"
                               AutomationProperties.Name="Display Mode Selection">
-                        <ComboBoxItem Content="Time and Date" Tag="Both" IsSelected="True"/>
+                        <ComboBoxItem Content="Time, Date and Day" Tag="Both" IsSelected="True"/>
                         <ComboBoxItem Content="Date Above Time" Tag="DateAbove"/>
                         <ComboBoxItem Content="Time Only" Tag="TimeOnly"/>
                         <ComboBoxItem Content="Date Only" Tag="DateOnly"/>
+                        <ComboBoxItem Content="Day Only" Tag="DayOnly"/>
                     </ComboBox>
                 </StackPanel>
             </GroupBox>
@@ -191,13 +235,20 @@
                                    Foreground="Black"
                                    HorizontalAlignment="Center"
                                    AutomationProperties.Name="Time Preview"/>
+                        <TextBlock x:Name="PreviewDayOfWeek" 
+                                   Text="Monday" 
+                                   FontFamily="{StaticResource ClockFont}"
+                                   FontSize="24" 
+                                   Foreground="Black"
+                                   HorizontalAlignment="Center"
+                                   AutomationProperties.Name="Day of Week Preview"/>
                         <TextBlock x:Name="PreviewDate" 
                                    Text="2024 Jan 15" 
                                    FontFamily="{StaticResource ClockFont}"
                                    FontSize="24" 
                                    Foreground="Black"
                                    HorizontalAlignment="Center"
-                                   Margin="0,5,0,0"
+                                   Margin="0,3,0,0"
                                    AutomationProperties.Name="Date Preview"/>
                     </StackPanel>
                 </Border>

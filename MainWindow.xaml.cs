@@ -9,18 +9,22 @@ using System.Windows.Automation;
 using Microsoft.Win32;
 using BearsAdaClock.Properties;
 
+#nullable enable
 namespace BearsAdaClock
 {
     public partial class MainWindow : Window
     {
-        private DispatcherTimer timer;
-        private SettingsWindow settingsWindow;
+        private DispatcherTimer timer = default!;
+        private SettingsWindow? settingsWindow;
         private bool _firstUpdateLogged = false;
         public double DigitSize { get; set; } = 56;
         public double DateSize { get; set; } = 32;
+        public double DayOfWeekSize { get; set; } = 32;
         public Brush DigitColor { get; set; } = Brushes.Black;
         public Brush DateColor { get; set; } = Brushes.Black;
+        public Brush DayOfWeekColor { get; set; } = Brushes.Black;
         public string DateFormat { get; set; } = "yyyy MMM dd";
+        public string DayOfWeekFormat { get; set; } = "dddd";
         public string DisplayMode { get; set; } = "Both";
         public bool ShowSeconds { get; set; } = false;
 
@@ -50,9 +54,12 @@ namespace BearsAdaClock
             {
                 DigitSize = Settings.Default.DigitSize;
                 DateSize = Settings.Default.DateSize;
+                DayOfWeekSize = Settings.Default.DayOfWeekSize;
                 DigitColor = GetBrushFromName(Settings.Default.DigitColor);
                 DateColor = GetBrushFromName(Settings.Default.DateColor);
+                DayOfWeekColor = GetBrushFromName(Settings.Default.DayOfWeekColor);
                 DateFormat = Settings.Default.DateFormat;
+                DayOfWeekFormat = Settings.Default.DayOfWeekFormat;
                 DisplayMode = Settings.Default.DisplayMode;
                 ShowSeconds = Settings.Default.ShowSeconds;
             }
@@ -68,9 +75,12 @@ namespace BearsAdaClock
             {
                 Settings.Default.DigitSize = DigitSize;
                 Settings.Default.DateSize = DateSize;
+                Settings.Default.DayOfWeekSize = DayOfWeekSize;
                 Settings.Default.DigitColor = GetColorName(DigitColor);
                 Settings.Default.DateColor = GetColorName(DateColor);
+                Settings.Default.DayOfWeekColor = GetColorName(DayOfWeekColor);
                 Settings.Default.DateFormat = DateFormat;
+                Settings.Default.DayOfWeekFormat = DayOfWeekFormat;
                 Settings.Default.DisplayMode = DisplayMode;
                 Settings.Default.ShowSeconds = ShowSeconds;
                 Settings.Default.WindowLeft = this.Left;
@@ -153,7 +163,7 @@ namespace BearsAdaClock
             }
         }
 
-        private void Timer_Tick(object sender, EventArgs e)
+        private void Timer_Tick(object? sender, EventArgs e)
         {
             UpdateDisplay();
         }
@@ -173,12 +183,17 @@ namespace BearsAdaClock
             DateDisplay.Text = FormatDate(now, DateFormat);
             DateDisplay.FontSize = DateSize;
             DateDisplay.Foreground = DateColor;
+            DayOfWeekDisplay.Text = now.ToString(DayOfWeekFormat);
+            DayOfWeekDisplay.FontSize = DayOfWeekSize;
+            DayOfWeekDisplay.Foreground = DayOfWeekColor;
             UpdateDisplayMode();
             string timeAnnouncement = ShowSeconds ? now.ToString("h:mm:ss tt") : now.ToString("h:mm tt");
-            if (DisplayMode != "DateOnly")
+            if (DisplayMode != "DateOnly" && DisplayMode != "DayOnly")
                 AutomationProperties.SetName(TimeDisplay, $"Current time is {timeAnnouncement}");
-            if (DisplayMode != "TimeOnly")
+            if (DisplayMode != "TimeOnly" && DisplayMode != "DayOnly")
                 AutomationProperties.SetName(DateDisplay, $"Current date is {FormatDate(now, DateFormat)}");
+            if (DisplayMode != "TimeOnly" && DisplayMode != "DateOnly")
+                AutomationProperties.SetName(DayOfWeekDisplay, $"Current day of week is {now.ToString("dddd")}");
         }
 
         private void UpdateDisplayMode()
@@ -187,7 +202,8 @@ namespace BearsAdaClock
             string safeDisplayMode = DisplayMode;
             if (string.IsNullOrEmpty(safeDisplayMode) ||
                 (safeDisplayMode != "Both" && safeDisplayMode != "DateAbove" &&
-                 safeDisplayMode != "TimeOnly" && safeDisplayMode != "DateOnly"))
+                 safeDisplayMode != "TimeOnly" && safeDisplayMode != "DateOnly" &&
+                 safeDisplayMode != "DayOnly"))
             {
                 safeDisplayMode = "Both";
                 DisplayMode = "Both";
@@ -196,39 +212,57 @@ namespace BearsAdaClock
             {
                 case "Both":
                     ClockPanel.Children.Add(TimeDisplay);
+                    ClockPanel.Children.Add(DayOfWeekDisplay);
                     ClockPanel.Children.Add(DateDisplay);
                     TimeDisplay.Visibility = Visibility.Visible;
                     DateDisplay.Visibility = Visibility.Visible;
+                    DayOfWeekDisplay.Visibility = Visibility.Visible;
                     TimeDisplay.Margin = new Thickness(0, 0, 0, 0);
-                    DateDisplay.Margin = new Thickness(0, 5, 0, 0);
+                    DayOfWeekDisplay.Margin = new Thickness(0, 3, 0, 0);
+                    DateDisplay.Margin = new Thickness(0, 3, 0, 0);
                     break;
                 case "DateAbove":
+                    ClockPanel.Children.Add(DayOfWeekDisplay);
                     ClockPanel.Children.Add(DateDisplay);
                     ClockPanel.Children.Add(TimeDisplay);
                     TimeDisplay.Visibility = Visibility.Visible;
                     DateDisplay.Visibility = Visibility.Visible;
-                    DateDisplay.Margin = new Thickness(0, 0, 0, 0);
-                    TimeDisplay.Margin = new Thickness(0, 5, 0, 0);
+                    DayOfWeekDisplay.Visibility = Visibility.Visible;
+                    DayOfWeekDisplay.Margin = new Thickness(0, 0, 0, 0);
+                    DateDisplay.Margin = new Thickness(0, 3, 0, 0);
+                    TimeDisplay.Margin = new Thickness(0, 3, 0, 0);
                     break;
                 case "TimeOnly":
                     ClockPanel.Children.Add(TimeDisplay);
                     TimeDisplay.Visibility = Visibility.Visible;
                     DateDisplay.Visibility = Visibility.Collapsed;
+                    DayOfWeekDisplay.Visibility = Visibility.Collapsed;
                     TimeDisplay.Margin = new Thickness(0, 0, 0, 0);
                     break;
                 case "DateOnly":
                     ClockPanel.Children.Add(DateDisplay);
                     TimeDisplay.Visibility = Visibility.Collapsed;
                     DateDisplay.Visibility = Visibility.Visible;
+                    DayOfWeekDisplay.Visibility = Visibility.Collapsed;
                     DateDisplay.Margin = new Thickness(0, 0, 0, 0);
+                    break;
+                case "DayOnly":
+                    ClockPanel.Children.Add(DayOfWeekDisplay);
+                    TimeDisplay.Visibility = Visibility.Collapsed;
+                    DateDisplay.Visibility = Visibility.Collapsed;
+                    DayOfWeekDisplay.Visibility = Visibility.Visible;
+                    DayOfWeekDisplay.Margin = new Thickness(0, 0, 0, 0);
                     break;
                 default:
                     ClockPanel.Children.Add(TimeDisplay);
+                    ClockPanel.Children.Add(DayOfWeekDisplay);
                     ClockPanel.Children.Add(DateDisplay);
                     TimeDisplay.Visibility = Visibility.Visible;
                     DateDisplay.Visibility = Visibility.Visible;
+                    DayOfWeekDisplay.Visibility = Visibility.Visible;
                     TimeDisplay.Margin = new Thickness(0, 0, 0, 0);
-                    DateDisplay.Margin = new Thickness(0, 5, 0, 0);
+                    DayOfWeekDisplay.Margin = new Thickness(0, 3, 0, 0);
+                    DateDisplay.Margin = new Thickness(0, 3, 0, 0);
                     DisplayMode = "Both";
                     break;
             }
@@ -295,7 +329,7 @@ namespace BearsAdaClock
         {
             try
             {
-                string logsDir = Logger.LogDirectory; // resolved by Logger
+                string logsDir = Logger.LogDirectoryPath; // resolved by Logger
                 if (!Directory.Exists(logsDir))
                 {
                     Directory.CreateDirectory(logsDir);
@@ -384,7 +418,9 @@ namespace BearsAdaClock
                 Logger.Info($"InitializeStartupSetting - isFirstRun={isFirstRun}");
                 if (isFirstRun)
                 {
-                    EnableStartup();
+                    RegistryHelper.SetStartup(true);
+                    Settings.Default.StartWithWindows = true;
+                    Settings.Default.Save();
                     Logger.Info("InitializeStartupSetting - Enabled startup on first run.");
                     MarkAsRun();
                 }
@@ -402,29 +438,15 @@ namespace BearsAdaClock
         {
             try
             {
-                bool registryStartupEnabled = IsStartupEnabledInRegistry();
                 bool settingsStartupEnabled = Settings.Default.StartWithWindows;
+                bool registryStartupEnabled = RegistryHelper.IsStartupEnabled();
                 Logger.Info($"SynchronizeStartupSetting - registry={registryStartupEnabled}, settings={settingsStartupEnabled}");
 
-                // Enforce the user's stored preference. If they want it to start with Windows,
-                // recreate the Startup shortcut/Run entry if it was removed or disabled.
-                if (settingsStartupEnabled && !registryStartupEnabled)
+                if (settingsStartupEnabled != registryStartupEnabled)
                 {
-                    RegistryHelper.SetStartup(true);
-                    // Save remains true as per preference
-                    Settings.Default.StartWithWindows = true;
-                    Settings.Default.Save();
-                    Logger.Info("SynchronizeStartupSetting - Re-enabled autostart per settings.");
+                    RegistryHelper.SetStartup(settingsStartupEnabled);
+                    Logger.Info($"SynchronizeStartupSetting - Synced registry to {settingsStartupEnabled} per settings.");
                 }
-                // If the user disabled it in settings but registry still has it enabled, turn it off.
-                else if (!settingsStartupEnabled && registryStartupEnabled)
-                {
-                    RegistryHelper.SetStartup(false);
-                    Settings.Default.StartWithWindows = false;
-                    Settings.Default.Save();
-                    Logger.Info("SynchronizeStartupSetting - Disabled autostart per settings.");
-                }
-                // If both match, nothing to do.
             }
             catch (Exception ex)
             {
@@ -433,20 +455,13 @@ namespace BearsAdaClock
         }
         private bool IsStartupEnabledInRegistry()
         {
-            try
-            {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", false))
-                {
-                    return key?.GetValue("BearsAdaClock") != null;
-                }
-            }
-            catch { return false; }
+            return RegistryHelper.IsStartupEnabled();
         }
         private bool IsFirstRun()
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\N6REJ\BearsAdaClock", false))
+                using (RegistryKey? key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\N6REJ\BearsAdaClock", false))
                 {
                     return key?.GetValue("HasRun") == null;
                 }
@@ -457,21 +472,9 @@ namespace BearsAdaClock
         {
             try
             {
-                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\N6REJ\BearsAdaClock"))
+                using (RegistryKey? key = Registry.CurrentUser.CreateSubKey(@"SOFTWARE\N6REJ\BearsAdaClock"))
                 {
                     key?.SetValue("HasRun", "true");
-                }
-            }
-            catch { }
-        }
-        private void EnableStartup()
-        {
-            try
-            {
-                string executablePath = GetExecutablePath();
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Run", true))
-                {
-                    key?.SetValue("BearsAdaClock", $"\"{executablePath}\"");
                 }
             }
             catch { }
@@ -481,7 +484,7 @@ namespace BearsAdaClock
             try
             {
                 // Prefer the actual process main module path
-                string processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
+                string? processPath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
                 if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
                     return processPath;
 

@@ -38,14 +38,14 @@
     <Setting Name="EnableLogging" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-     <Setting Name="EnableLogging" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+    <Setting Name="DayOfWeekSize" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">32</Value>
     </Setting>
-     <Setting Name="EnableLogging" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+    <Setting Name="DayOfWeekColor" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Black</Value>
     </Setting>
-     <Setting Name="EnableLogging" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+    <Setting Name="DayOfWeekFormat" Type="System.String" Scope="User">
+      <Value Profile="(Default)">dddd</Value>
     </Setting>
   </Settings>
 </SettingsFile>

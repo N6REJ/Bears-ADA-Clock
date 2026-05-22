@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
+#nullable enable
 namespace BearsAdaClock
 {
     public static class RegistryHelper
@@ -104,7 +105,7 @@ namespace BearsAdaClock
                 string? runRaw = null;
                 string? runExe = null;
 
-                using (RegistryKey runKey = Registry.CurrentUser.OpenSubKey(RUN_REGISTRY_PATH, false))
+                using (RegistryKey? runKey = Registry.CurrentUser.OpenSubKey(RUN_REGISTRY_PATH, false))
                 {
                     object? val = runKey?.GetValue(APP_NAME);
                     runRaw = val as string;
@@ -115,7 +116,7 @@ namespace BearsAdaClock
                     }
                 }
 
-                using (RegistryKey approvedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
+                using (RegistryKey? approvedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
                 {
                     var val = approvedKey?.GetValue(APP_NAME) as byte[];
                     if (val != null && val.Length > 0)
@@ -234,7 +235,7 @@ namespace BearsAdaClock
             try
             {
                 // First try to get the main module file name (works for both single-file and regular deployments)
-                string processPath = Process.GetCurrentProcess().MainModule?.FileName;
+                string? processPath = Process.GetCurrentProcess().MainModule?.FileName;
                 if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
                     return processPath;
                 
@@ -245,19 +246,28 @@ namespace BearsAdaClock
                     return exePath;
                 
                 // Fallback to assembly location (for non-single-file deployments)
-                string assemblyPath = Assembly.GetExecutingAssembly().Location;
+                string? assemblyPath = null;
+                try
+                {
+                    assemblyPath = null; // Don't use Assembly.Location in single-file apps
+                }
+                catch { }
+
                 if (!string.IsNullOrEmpty(assemblyPath))
                 {
                     if (assemblyPath.EndsWith(".dll"))
                     {
                         string dllExePath = Path.ChangeExtension(assemblyPath, ".exe");
                         if (File.Exists(dllExePath)) return dllExePath;
-                        string directory = Path.GetDirectoryName(assemblyPath);
-                        string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                        string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                        if (File.Exists(potentialExePath)) return potentialExePath;
-                        string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
-                        if (File.Exists(clockExePath)) return clockExePath;
+                        string? directory = Path.GetDirectoryName(assemblyPath);
+                        if (directory != null)
+                        {
+                            string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
+                            string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
+                            if (File.Exists(potentialExePath)) return potentialExePath;
+                            string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
+                            if (File.Exists(clockExePath)) return clockExePath;
+                        }
                     }
                     return assemblyPath;
                 }
@@ -284,6 +294,7 @@ namespace BearsAdaClock
             }
             catch { }
         }
+#nullable restore
 
         #region COM Interop for Shell Link
         [ComImport]

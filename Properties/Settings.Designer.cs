@@ -166,5 +166,41 @@ namespace BearsAdaClock.Properties {
                 this["EnableLogging"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("32")]
+        public double DayOfWeekSize {
+            get {
+                return ((double)(this["DayOfWeekSize"]));
+            }
+            set {
+                this["DayOfWeekSize"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Black")]
+        public string DayOfWeekColor {
+            get {
+                return ((string)(this["DayOfWeekColor"]));
+            }
+            set {
+                this["DayOfWeekColor"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("dddd")]
+        public string DayOfWeekFormat {
+            get {
+                return ((string)(this["DayOfWeekFormat"]));
+            }
+            set {
+                this["DayOfWeekFormat"] = value;
+            }
+        }
     }
 }

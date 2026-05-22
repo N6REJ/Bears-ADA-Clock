@@ -8,6 +8,7 @@ using System.Windows.Automation;
 using Microsoft.Win32;
 using BearsAdaClock.Properties;
 
+#nullable enable
 namespace BearsAdaClock
 {
     public partial class SettingsWindow : Window
@@ -22,9 +23,16 @@ namespace BearsAdaClock
             // Set version text from assembly file version
             try
             {
-                var asm = Assembly.GetExecutingAssembly();
-                string? file = asm.Location;
-                string version = System.Diagnostics.FileVersionInfo.GetVersionInfo(file).FileVersion ?? asm.GetName().Version?.ToString() ?? "";
+                string version = System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? AppContext.BaseDirectory).FileVersion 
+                                 ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+                
+                // If it's running from a DLL in a non-single-file app, BaseDirectory might not be the exe
+                if (string.IsNullOrEmpty(version) || version == "0.0.0.0")
+                {
+                    // Fallback version
+                    version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0";
+                }
+
                 if (!string.IsNullOrWhiteSpace(version))
                 {
                     VersionText.Text = $"Version {version}";
@@ -41,14 +49,19 @@ namespace BearsAdaClock
             // Load current settings from main window
             DigitSizeSlider.Value = mainWindow.DigitSize;
             DateSizeSlider.Value = mainWindow.DateSize;
+            DayOfWeekSizeSlider.Value = mainWindow.DayOfWeekSize;
             ShowSecondsCheckBox.IsChecked = mainWindow.ShowSeconds;
             
             // Set color selections
             SetColorComboSelection(DigitColorCombo, mainWindow.DigitColor);
             SetColorComboSelection(DateColorCombo, mainWindow.DateColor);
+            SetColorComboSelection(DayOfWeekColorCombo, mainWindow.DayOfWeekColor);
             
             // Set date format selection
             SetDateFormatSelection(mainWindow.DateFormat);
+            
+            // Set day of week format selection
+            SetDayOfWeekFormatSelection(mainWindow.DayOfWeekFormat);
             
             // Set display mode selection
             SetDisplayModeSelection(mainWindow.DisplayMode);
@@ -62,6 +75,7 @@ namespace BearsAdaClock
             // Update value displays
             DigitSizeValue.Text = $"{mainWindow.DigitSize:F0}px";
             DateSizeValue.Text = $"{mainWindow.DateSize:F0}px";
+            DayOfWeekSizeValue.Text = $"{mainWindow.DayOfWeekSize:F0}px";
         }
 
         private void SetColorComboSelection(ComboBox combo, Brush brush)
@@ -84,6 +98,18 @@ namespace BearsAdaClock
                 if (item.Tag.ToString() == format)
                 {
                     DateFormatCombo.SelectedItem = item;
+                    break;
+                }
+            }
+        }
+
+        private void SetDayOfWeekFormatSelection(string format)
+        {
+            foreach (ComboBoxItem item in DayOfWeekFormatCombo.Items)
+            {
+                if (item.Tag.ToString() == format)
+                {
+                    DayOfWeekFormatCombo.SelectedItem = item;
                     break;
                 }
             }
@@ -155,9 +181,22 @@ namespace BearsAdaClock
                 case "DateAbove":
                 case "TimeOnly":
                 case "DateOnly":
+                case "DayOnly":
                     return true;
                 default:
                     return false; // Unknown or invalid mode
+            }
+        }
+
+        private void DayOfWeekSizeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (DayOfWeekSizeValue != null)
+            {
+                DayOfWeekSizeValue.Text = $"{e.NewValue:F0}px";
+                UpdatePreview();
+                
+                // Announce change to screen readers
+                AutomationProperties.SetName(DayOfWeekSizeSlider, $"Day of Week Size Slider - Current value {e.NewValue:F0} pixels");
             }
         }
 
@@ -207,6 +246,17 @@ namespace BearsAdaClock
             }
         }
 
+        private void DayOfWeekColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdatePreview();
+            
+            // Announce change to screen readers
+            if (DayOfWeekColorCombo.SelectedItem is ComboBoxItem item)
+            {
+                AutomationProperties.SetName(DayOfWeekColorCombo, $"Day of Week Color Selection - Current selection {item.Content}");
+            }
+        }
+
         private void DateFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdatePreview();
@@ -215,6 +265,17 @@ namespace BearsAdaClock
             if (DateFormatCombo.SelectedItem is ComboBoxItem item)
             {
                 AutomationProperties.SetName(DateFormatCombo, $"Date Format Selection - Current selection {item.Content}");
+            }
+        }
+
+        private void DayOfWeekFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdatePreview();
+            
+            // Announce change to screen readers
+            if (DayOfWeekFormatCombo.SelectedItem is ComboBoxItem item)
+            {
+                AutomationProperties.SetName(DayOfWeekFormatCombo, $"Day of Week Format Selection - Current selection {item.Content}");
             }
         }
 
@@ -240,66 +301,95 @@ namespace BearsAdaClock
 
         private void UpdatePreview()
         {
-            if (PreviewTime == null || PreviewDate == null || PreviewPanel == null) return;
+            if (PreviewTime == null || PreviewDate == null || PreviewDayOfWeek == null || PreviewPanel == null) return;
 
             // Update preview time with or without seconds
             bool showSeconds = ShowSecondsCheckBox.IsChecked == true;
             PreviewTime.Text = showSeconds ? "12:34:56" : "12:34";
             PreviewTime.FontSize = DigitSizeSlider.Value;
-            if (DigitColorCombo.SelectedItem is ComboBoxItem digitColorItem)
+            if (DigitColorCombo.SelectedItem is ComboBoxItem digitColorItem && digitColorItem.Tag != null)
             {
-                PreviewTime.Foreground = GetBrushFromName(digitColorItem.Tag.ToString());
+                PreviewTime.Foreground = GetBrushFromName(digitColorItem.Tag.ToString() ?? "Black");
             }
 
             // Update preview date
             PreviewDate.FontSize = DateSizeSlider.Value;
-            if (DateColorCombo.SelectedItem is ComboBoxItem dateColorItem)
+            if (DateColorCombo.SelectedItem is ComboBoxItem dateColorItem && dateColorItem.Tag != null)
             {
-                PreviewDate.Foreground = GetBrushFromName(dateColorItem.Tag.ToString());
+                PreviewDate.Foreground = GetBrushFromName(dateColorItem.Tag.ToString() ?? "Black");
             }
 
             // Update date format
-            if (DateFormatCombo.SelectedItem is ComboBoxItem formatItem)
+            if (DateFormatCombo.SelectedItem is ComboBoxItem formatItem && formatItem.Tag != null)
             {
                 var sampleDate = new DateTime(2024, 1, 15);
-                PreviewDate.Text = FormatDate(sampleDate, formatItem.Tag.ToString());
+                PreviewDate.Text = FormatDate(sampleDate, formatItem.Tag.ToString() ?? "yyyy MMM dd");
+            }
+
+            // Update preview day of week
+            PreviewDayOfWeek.FontSize = DayOfWeekSizeSlider.Value;
+            if (DayOfWeekColorCombo.SelectedItem is ComboBoxItem dayColorItem && dayColorItem.Tag != null)
+            {
+                PreviewDayOfWeek.Foreground = GetBrushFromName(dayColorItem.Tag.ToString() ?? "Black");
+            }
+
+            // Update day of week format
+            if (DayOfWeekFormatCombo.SelectedItem is ComboBoxItem dayFormatItem && dayFormatItem.Tag != null)
+            {
+                var sampleDate = new DateTime(2024, 1, 15); // Monday
+                PreviewDayOfWeek.Text = sampleDate.ToString(dayFormatItem.Tag.ToString() ?? "dddd");
             }
 
             // Update display mode - ensures at least one element is always visible
-            if (DisplayModeCombo.SelectedItem is ComboBoxItem modeItem)
+            if (DisplayModeCombo.SelectedItem is ComboBoxItem modeItem && modeItem.Tag != null)
             {
-                string mode = modeItem.Tag.ToString();
+                string mode = modeItem.Tag.ToString() ?? "Both";
                 PreviewPanel.Children.Clear();
 
                 switch (mode)
                 {
                     case "Both":
                         PreviewPanel.Children.Add(PreviewTime);
+                        PreviewPanel.Children.Add(PreviewDayOfWeek);
                         PreviewPanel.Children.Add(PreviewDate);
                         PreviewTime.Visibility = Visibility.Visible;
                         PreviewDate.Visibility = Visibility.Visible;
+                        PreviewDayOfWeek.Visibility = Visibility.Visible;
                         PreviewTime.Margin = new Thickness(0, 0, 0, 0);
-                        PreviewDate.Margin = new Thickness(0, 5, 0, 0);
+                        PreviewDayOfWeek.Margin = new Thickness(0, 3, 0, 0);
+                        PreviewDate.Margin = new Thickness(0, 3, 0, 0);
                         break;
                     case "DateAbove":
+                        PreviewPanel.Children.Add(PreviewDayOfWeek);
                         PreviewPanel.Children.Add(PreviewDate);
                         PreviewPanel.Children.Add(PreviewTime);
                         PreviewTime.Visibility = Visibility.Visible;
                         PreviewDate.Visibility = Visibility.Visible;
-                        PreviewDate.Margin = new Thickness(0, 0, 0, 0);
-                        PreviewTime.Margin = new Thickness(0, 5, 0, 0);
+                        PreviewDayOfWeek.Visibility = Visibility.Visible;
+                        PreviewDayOfWeek.Margin = new Thickness(0, 0, 0, 0);
+                        PreviewDate.Margin = new Thickness(0, 3, 0, 0);
+                        PreviewTime.Margin = new Thickness(0, 3, 0, 0);
                         break;
                     case "TimeOnly":
                         PreviewPanel.Children.Add(PreviewTime);
                         PreviewTime.Visibility = Visibility.Visible;
                         PreviewDate.Visibility = Visibility.Collapsed;
+                        PreviewDayOfWeek.Visibility = Visibility.Collapsed;
                         PreviewTime.Margin = new Thickness(0, 0, 0, 0);
                         break;
                     case "DateOnly":
                         PreviewPanel.Children.Add(PreviewDate);
                         PreviewTime.Visibility = Visibility.Collapsed;
                         PreviewDate.Visibility = Visibility.Visible;
+                        PreviewDayOfWeek.Visibility = Visibility.Collapsed;
                         PreviewDate.Margin = new Thickness(0, 0, 0, 0);
+                        break;
+                    case "DayOnly":
+                        PreviewPanel.Children.Add(PreviewDayOfWeek);
+                        PreviewTime.Visibility = Visibility.Collapsed;
+                        PreviewDate.Visibility = Visibility.Collapsed;
+                        PreviewDayOfWeek.Visibility = Visibility.Visible;
+                        PreviewDayOfWeek.Margin = new Thickness(0, 0, 0, 0);
                         break;
                 }
             }
@@ -322,9 +412,9 @@ namespace BearsAdaClock
         private void Apply_Click(object sender, RoutedEventArgs e)
         {
             // Validate display mode to ensure at least one element is visible
-            if (DisplayModeCombo.SelectedItem is ComboBoxItem validationModeItem)
+            if (DisplayModeCombo.SelectedItem is ComboBoxItem validationModeItem && validationModeItem.Tag != null)
             {
-                string selectedMode = validationModeItem.Tag.ToString();
+                string selectedMode = validationModeItem.Tag.ToString() ?? "Both";
                 
                 if (!IsValidDisplayMode(selectedMode))
                 {
@@ -343,26 +433,37 @@ namespace BearsAdaClock
             // Apply settings to main window
             mainWindow.DigitSize = DigitSizeSlider.Value;
             mainWindow.DateSize = DateSizeSlider.Value;
+            mainWindow.DayOfWeekSize = DayOfWeekSizeSlider.Value;
             mainWindow.ShowSeconds = ShowSecondsCheckBox.IsChecked == true;
 
-            if (DigitColorCombo.SelectedItem is ComboBoxItem digitColorItem)
+            if (DigitColorCombo.SelectedItem is ComboBoxItem digitColorItem && digitColorItem.Tag != null)
             {
-                mainWindow.DigitColor = GetBrushFromName(digitColorItem.Tag.ToString());
+                mainWindow.DigitColor = GetBrushFromName(digitColorItem.Tag.ToString() ?? "Black");
             }
 
-            if (DateColorCombo.SelectedItem is ComboBoxItem dateColorItem)
+            if (DateColorCombo.SelectedItem is ComboBoxItem dateColorItem && dateColorItem.Tag != null)
             {
-                mainWindow.DateColor = GetBrushFromName(dateColorItem.Tag.ToString());
+                mainWindow.DateColor = GetBrushFromName(dateColorItem.Tag.ToString() ?? "Black");
             }
 
-            if (DateFormatCombo.SelectedItem is ComboBoxItem formatItem)
+            if (DayOfWeekColorCombo.SelectedItem is ComboBoxItem dayColorItem && dayColorItem.Tag != null)
             {
-                mainWindow.DateFormat = formatItem.Tag.ToString();
+                mainWindow.DayOfWeekColor = GetBrushFromName(dayColorItem.Tag.ToString() ?? "Black");
             }
 
-            if (DisplayModeCombo.SelectedItem is ComboBoxItem applyModeItem)
+            if (DateFormatCombo.SelectedItem is ComboBoxItem formatItem && formatItem.Tag != null)
             {
-                mainWindow.DisplayMode = applyModeItem.Tag.ToString();
+                mainWindow.DateFormat = formatItem.Tag.ToString() ?? "yyyy MMM dd";
+            }
+
+            if (DayOfWeekFormatCombo.SelectedItem is ComboBoxItem dayFormatItem && dayFormatItem.Tag != null)
+            {
+                mainWindow.DayOfWeekFormat = dayFormatItem.Tag.ToString() ?? "dddd";
+            }
+
+            if (DisplayModeCombo.SelectedItem is ComboBoxItem applyModeItem && applyModeItem.Tag != null)
+            {
+                mainWindow.DisplayMode = applyModeItem.Tag.ToString() ?? "Both";
             }
 
             mainWindow.ApplySettings();

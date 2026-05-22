@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Automation;
 using BearsAdaClock.Properties;
 
+#nullable enable
 namespace BearsAdaClock
 {
     public partial class App : Application
@@ -11,12 +12,22 @@ namespace BearsAdaClock
         protected override void OnStartup(StartupEventArgs e)
         {
             // Attach global exception handlers early
-            AppDomain.CurrentDomain.UnhandledException += (s, ex) => Logger.Error(ex.ExceptionObject as Exception ?? new Exception(ex.ExceptionObject?.ToString() ?? "Unknown"), "AppDomain.UnhandledException");
+            AppDomain.CurrentDomain.UnhandledException += (s, ev) =>
+            {
+                if (ev.ExceptionObject is Exception exObj)
+                {
+                    Logger.Error(exObj, "AppDomain.UnhandledException");
+                }
+                else
+                {
+                    Logger.Error("AppDomain.UnhandledException", new Exception(ev.ExceptionObject?.ToString() ?? "Unknown"));
+                }
+            };
             this.DispatcherUnhandledException += (s, ex) => { Logger.Error(ex.Exception, "DispatcherUnhandledException"); ex.Handled = true; };
             TaskScheduler.UnobservedTaskException += (s, ex) => { Logger.Error(ex.Exception, "TaskScheduler.UnobservedTaskException"); ex.SetObserved(); };
 
             Logger.Info($"App.OnStartup - args='{string.Join(" ", e.Args ?? Array.Empty<string>())}', workingDir='{Environment.CurrentDirectory}', user='{Environment.UserName}'");
-            Logger.Info($"Logger path in use: {Logger.LogFilePath}");
+            Logger.Info($"Logger path in use: {Logger.LogFilePathLocation}");
 
             base.OnStartup(e);
             

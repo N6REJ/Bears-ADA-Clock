@@ -37,13 +37,21 @@
                        HorizontalAlignment="Center"
                        AutomationProperties.Name="Current Time"
                        AutomationProperties.LiveSetting="Polite"/>
+            <TextBlock x:Name="DayOfWeekDisplay" 
+                       Text="Day" 
+                       FontFamily="{StaticResource ClockFont}"
+                       FontSize="32" 
+                       Foreground="Black"
+                       HorizontalAlignment="Center"
+                       AutomationProperties.Name="Current Day of Week"
+                       AutomationProperties.LiveSetting="Polite"/>
             <TextBlock x:Name="DateDisplay" 
                        Text="YYYY MMM DD" 
                        FontFamily="{StaticResource ClockFont}"
                        FontSize="32" 
                        Foreground="Black"
                        HorizontalAlignment="Center"
-                       Margin="0,5,0,0"
+                       Margin="0,3,0,0"
                        AutomationProperties.Name="Current Date"
                        AutomationProperties.LiveSetting="Polite"/>
         </StackPanel>
