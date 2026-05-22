@@ -1,6 +1,7 @@
 <Window x:Class="BearsAdaClock.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:BearsAdaClock"
         Title="Bears ADA Clock Settings" 
         Height="1100" 
         Width="600"
@@ -19,7 +20,6 @@
                        Margin="0,0,0,0"
                        AutomationProperties.Name="Settings Window Title"/>
             <TextBlock x:Name="VersionText"
-                       Text="Version"
                        FontSize="12"
                        Foreground="Gray"
                        HorizontalAlignment="Center"
