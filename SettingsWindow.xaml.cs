@@ -20,17 +20,17 @@ namespace BearsAdaClock
             InitializeComponent();
             mainWindow = parent;
 
-            // Set version text from assembly file version
+            // Set version text from assembly information
             try
             {
-                string version = System.Diagnostics.FileVersionInfo.GetVersionInfo(System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? AppContext.BaseDirectory).FileVersion 
-                                 ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+                // Use the version from the AssemblyName, which is what we updated in the .csproj
+                var assembly = Assembly.GetExecutingAssembly();
+                string version = assembly.GetName().Version?.ToString() ?? "0.0.0.0";
                 
-                // If it's running from a DLL in a non-single-file app, BaseDirectory might not be the exe
-                if (string.IsNullOrEmpty(version) || version == "0.0.0.0")
+                // Clean up trailing .0 if it's the 4th component and not needed
+                if (version.EndsWith(".0") && version.Split('.').Length == 4)
                 {
-                    // Fallback version
-                    version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0";
+                    version = version.Substring(0, version.Length - 2);
                 }
 
                 if (!string.IsNullOrWhiteSpace(version))
