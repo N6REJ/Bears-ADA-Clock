@@ -442,6 +442,7 @@ namespace BearsAdaClock
                 bool registryStartupEnabled = RegistryHelper.IsStartupEnabled();
                 Logger.Info($"SynchronizeStartupSetting - registry={registryStartupEnabled}, settings={settingsStartupEnabled}");
 
+                // Update registry to match settings if they differ
                 if (settingsStartupEnabled != registryStartupEnabled)
                 {
                     RegistryHelper.SetStartup(settingsStartupEnabled);

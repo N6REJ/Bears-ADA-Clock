@@ -14,7 +14,7 @@ namespace BearsAdaClock
         private const string STARTUP_APPROVED_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
         private const string APP_NAME = "BearsAdaClock";
 
-        // Prefer Startup folder shortcut like other working projects; keep registry fallback for compatibility
+        // Use Registry HKCU\Run as the primary and most reliable startup mechanism
         public static void SetStartup(bool enabled)
         {
             try
@@ -22,54 +22,55 @@ namespace BearsAdaClock
                 string exePath = GetExecutablePath();
                 string shortcutPath = GetStartupShortcutPath();
 
-                Log($"SetStartup(enabled={enabled}) exePath='{exePath}' shortcutPath='{shortcutPath}'");
+                Log($"SetStartup(enabled={enabled}) exePath='{exePath}'");
 
                 using (RegistryKey runKey = Registry.CurrentUser.CreateSubKey(RUN_REGISTRY_PATH, true))
                 using (RegistryKey approvedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
                 {
                     if (enabled)
                     {
-                        // Try to create the Startup shortcut first
-                        bool shortcutCreated = TryCreateStartupShortcut(shortcutPath, exePath);
-                        Log($"TryCreateStartupShortcut => {shortcutCreated} existsAfter={File.Exists(shortcutPath)}");
-
-                        if (shortcutCreated)
+                        // Ensure Run key is set as the primary reliable mechanism
+                        try
                         {
-                            // Shortcut created successfully: clean any stale Run/StartupApproved entries
-                            try { if (runKey?.GetValue(APP_NAME) != null) { runKey.DeleteValue(APP_NAME, false); Log("Deleted stale Run entry"); } } catch (Exception ex) { Log("Delete Run entry failed: " + ex.Message); }
-                            try { if (approvedKey?.GetValue(APP_NAME) != null) { approvedKey.DeleteValue(APP_NAME, false); Log("Deleted stale StartupApproved entry"); } } catch (Exception ex) { Log("Delete StartupApproved failed: " + ex.Message); }
+                            runKey?.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
+                            Log("Set HKCU Run entry to '" + exePath + "'");
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            // Shortcut creation failed: ensure Run key is set as a reliable fallback
-                            try
-                            {
-                                runKey?.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
-                                Log("Set HKCU Run fallback to '" + exePath + "'");
-                            }
-                            catch (Exception ex)
-                            {
-                                Log("Failed to set Run fallback: " + ex.Message);
-                            }
+                            Log("Failed to set Run entry: " + ex.Message);
+                        }
 
-                            // Clear any disabled marker so Windows will launch it
-                            try
+                        // Clear any disabled marker in StartupApproved so Windows will launch it
+                        try
+                        {
+                            if (approvedKey?.GetValue(APP_NAME) != null)
                             {
-                                if (approvedKey?.GetValue(APP_NAME) != null) { approvedKey.DeleteValue(APP_NAME, false); Log("Cleared StartupApproved disabled marker"); }
-                            }
-                            catch (Exception ex)
-                            {
-                                Log("Failed to clear StartupApproved: " + ex.Message);
+                                approvedKey.DeleteValue(APP_NAME, false);
+                                Log("Cleared StartupApproved disabled marker");
                             }
                         }
+                        catch (Exception ex)
+                        {
+                            Log("Failed to clear StartupApproved: " + ex.Message);
+                        }
+
+                        // Clean up old shortcut if it exists to avoid duplicate/conflicting startup methods
+                        DeleteStartupShortcut(shortcutPath);
                     }
                     else
                     {
-                        // Disable autostart: remove shortcut and Run entry, and mark disabled for UI
-                        DeleteStartupShortcut(shortcutPath);
-                        Log("Deleted shortcut if existed");
+                        // Disable autostart: remove Run entry and shortcut, and mark disabled for UI
+                        try
+                        {
+                            if (runKey?.GetValue(APP_NAME) != null)
+                            {
+                                runKey.DeleteValue(APP_NAME, false);
+                                Log("Deleted Run entry");
+                            }
+                        }
+                        catch (Exception ex) { Log("Delete Run failed: " + ex.Message); }
 
-                        try { if (runKey?.GetValue(APP_NAME) != null) { runKey.DeleteValue(APP_NAME, false); Log("Deleted Run entry"); } } catch (Exception ex) { Log("Delete Run failed: " + ex.Message); }
+                        DeleteStartupShortcut(shortcutPath);
 
                         // Mark as disabled in StartupApproved so Windows reflects state in Startup Apps UI
                         try
@@ -126,7 +127,7 @@ namespace BearsAdaClock
                     }
                 }
 
-                bool enabled = hasShortcut || (hasValidRunEntry && !isDisabledByApproval);
+                bool enabled = (hasValidRunEntry && !isDisabledByApproval) || hasShortcut;
                 Log($"IsStartupEnabled => {enabled} hasShortcut={hasShortcut} hasValidRunEntry={hasValidRunEntry} runRaw='{runRaw}' runExe='{runExe}' disabledByApproval={isDisabledByApproval}");
                 return enabled;
             }
@@ -163,6 +164,8 @@ namespace BearsAdaClock
 
         private static bool TryCreateStartupShortcut(string shortcutPath, string exePath)
         {
+            // Note: This method is now legacy and kept for potential future use or manual calls.
+            // SetStartup now prioritizes HKCU\Run.
             try { Directory.CreateDirectory(Path.GetDirectoryName(shortcutPath)!); } catch (Exception ex) { Log("CreateDirectory failed: " + ex.Message); }
 
             // Try robust ShellLink COM first (works even if Windows Script Host is disabled)
@@ -296,7 +299,8 @@ namespace BearsAdaClock
         }
 #nullable restore
 
-        #region COM Interop for Shell Link
+        // Clean up unneeded COM types if no longer used by SetStartup
+        #region COM Interop for Shell Link (Legacy)
         [ComImport]
         [Guid("000214F9-0000-0000-C000-000000000046")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
