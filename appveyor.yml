@@ -17,12 +17,11 @@ build: off
 build_script:
   # 1) Publish the app. The .vdproj packages this publish output.
   - ps: 'dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true; if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }'
-  # 2) Allow .vdproj builds outside the Visual Studio IDE (required on CI).
-  #    Guarded: the extension is preinstalled on the image, but skip if the tool is absent.
-  - ps: '$disableOutOfProc = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\VSI\DisableOutOfProcBuild\DisableOutOfProcBuild.exe"; if (Test-Path $disableOutOfProc) { & $disableOutOfProc; if ($LASTEXITCODE -ne 0) { throw "DisableOutOfProcBuild failed: $LASTEXITCODE" } } else { Write-Host "DisableOutOfProcBuild.exe not found - skipping" }'
-  # 3) Build the MSI with devenv (the only tool that supports .vdproj).
+  # 2) Build the MSI with devenv (the only tool that supports .vdproj).
+  #    The Installer Projects extension is preinstalled on this image, so no
+  #    DisableOutOfProcBuild tweak is needed (running it from the repo root fails).
   - ps: '& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.com" "BearsAdaClock.sln" /Build "Release" /Project "Installer\Installer.vdproj"; if ($LASTEXITCODE -ne 0) { throw "devenv failed: $LASTEXITCODE" }'
-  # 4) Log the produced MSI.
+  # 3) Log the produced MSI.
   - ps: 'Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize'
 
 artifacts:
