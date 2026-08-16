@@ -2,7 +2,6 @@
 using System;
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Runtime.InteropServices;
 
 #nullable enable
@@ -12,9 +11,18 @@ namespace BearsAdaClock
     {
         private const string RUN_REGISTRY_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
         private const string STARTUP_APPROVED_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+        private const string STARTUP_APPROVED_STARTUP_FOLDER_PATH = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder";
         private const string APP_NAME = "BearsAdaClock";
+        private const string AUTOSTART_ARG = "--autostart";
+        private const string STARTUP_SHORTCUT_FILE = APP_NAME + ".lnk";
+        private const string LAUNCHER_FILE = "BearsAdaClockLauncher.cmd";
 
-        // Use Registry HKCU\Run as the primary and most reliable startup mechanism
+        // The primary startup mechanism is HKCU\Run. To be reliable on all machines, the
+        // Run entry points at a small launcher .cmd that uses `start` to launch the app.
+        // (Launching the single-file exe directly from the Run key has been observed to
+        // fail silently at logon on some systems, while a `start`-based launcher works.)
+        // A Startup-folder shortcut is only used as a fallback if the registry write
+        // cannot be verified.
         public static void SetStartup(bool enabled)
         {
             try
@@ -25,44 +33,90 @@ namespace BearsAdaClock
                 Log($"SetStartup(enabled={enabled}) exePath='{exePath}'");
 
                 using (RegistryKey runKey = Registry.CurrentUser.CreateSubKey(RUN_REGISTRY_PATH, true))
-                using (RegistryKey approvedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
+                using (RegistryKey runApprovedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_PATH, true))
+                using (RegistryKey folderApprovedKey = Registry.CurrentUser.CreateSubKey(STARTUP_APPROVED_STARTUP_FOLDER_PATH, true))
                 {
                     if (enabled)
                     {
-                        // Ensure Run key is set as the primary reliable mechanism
-                        try
+                        // ---- Primary: HKCU\Run via launcher .cmd ----
+                        bool runEntryWritten = false;
+                        string launcherPath = GetLauncherPath();
+                        if (TryWriteLauncher(exePath, launcherPath))
                         {
-                            runKey?.SetValue(APP_NAME, $"\"{exePath}\"", RegistryValueKind.String);
-                            Log("Set HKCU Run entry to '" + exePath + "'");
-                        }
-                        catch (Exception ex)
-                        {
-                            Log("Failed to set Run entry: " + ex.Message);
-                        }
-
-                        // Clear any disabled marker in StartupApproved so Windows will launch it
-                        try
-                        {
-                            if (approvedKey?.GetValue(APP_NAME) != null)
+                            Log("Launcher written to '" + launcherPath + "'");
+                            string runValue = $"\"{launcherPath}\"";
+                            try
                             {
-                                approvedKey.DeleteValue(APP_NAME, false);
-                                Log("Cleared StartupApproved disabled marker");
+                                runKey.SetValue(APP_NAME, runValue, RegistryValueKind.String);
+                                runEntryWritten = VerifyRunEntry(exePath);
+                                if (runEntryWritten)
+                                    Log("Set HKCU Run entry to '" + runValue + "'");
+                                else
+                                    Log("HKCU Run entry was written but verification failed");
+                            }
+                            catch (Exception ex)
+                            {
+                                Log("Failed to set HKCU Run entry: " + ex.Message);
                             }
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            Log("Failed to clear StartupApproved: " + ex.Message);
+                            Log("Launcher write failed");
                         }
 
-                        // Clean up old shortcut if it exists to avoid duplicate/conflicting startup methods
-                        DeleteStartupShortcut(shortcutPath);
+                        if (!runEntryWritten)
+                        {
+                            // ---- Fallback: direct exe entry ----
+                            string runValue = $"\"{exePath}\" {AUTOSTART_ARG}";
+                            try
+                            {
+                                runKey.SetValue(APP_NAME, runValue, RegistryValueKind.String);
+                                runEntryWritten = VerifyRunEntry(exePath);
+                                if (runEntryWritten)
+                                    Log("Set HKCU Run entry (direct) to '" + runValue + "'");
+                                else
+                                    Log("HKCU Run entry (direct) was written but verification failed");
+                            }
+                            catch (Exception ex)
+                            {
+                                Log("Failed to set HKCU Run entry (direct): " + ex.Message);
+                            }
+                        }
+
+                        if (runEntryWritten)
+                        {
+                            // Mark enabled in Startup Apps UI (0x02) so Task Manager shows it as enabled.
+                            WriteApprovedMarker(runApprovedKey, APP_NAME, 0x02);
+                            Log("Set StartupApproved\\Run enabled marker");
+
+                            // Remove the legacy Startup-folder shortcut and its approval entry so the
+                            // single reliable mechanism (HKCU\Run) is used and there is no double launch.
+                            DeleteStartupShortcut(shortcutPath);
+                            DeleteApprovedMarker(folderApprovedKey, STARTUP_SHORTCUT_FILE);
+                            Log("Cleaned up legacy Startup folder shortcut");
+                        }
+                        else
+                        {
+                            // ---- Fallback: Startup-folder shortcut (older mechanism) ----
+                            Log("HKCU Run approach failed; falling back to Startup folder shortcut");
+                            bool shortcutCreated = TryCreateStartupShortcut(shortcutPath, exePath);
+                            if (shortcutCreated)
+                            {
+                                WriteApprovedMarker(folderApprovedKey, STARTUP_SHORTCUT_FILE, 0x02);
+                                Log("Created Startup folder shortcut fallback and marked it enabled");
+                            }
+                            else
+                            {
+                                Log("Both HKCU Run and Startup folder shortcut failed");
+                            }
+                        }
                     }
                     else
                     {
-                        // Disable autostart: remove Run entry and shortcut, and mark disabled for UI
+                        // Disable autostart: remove Run entry and shortcut, mark disabled for UI.
                         try
                         {
-                            if (runKey?.GetValue(APP_NAME) != null)
+                            if (runKey.GetValue(APP_NAME) != null)
                             {
                                 runKey.DeleteValue(APP_NAME, false);
                                 Log("Deleted Run entry");
@@ -72,18 +126,9 @@ namespace BearsAdaClock
 
                         DeleteStartupShortcut(shortcutPath);
 
-                        // Mark as disabled in StartupApproved so Windows reflects state in Startup Apps UI
-                        try
-                        {
-                            byte[] disabled = new byte[12];
-                            disabled[0] = 0x03; // 0x03 indicates disabled
-                            approvedKey?.SetValue(APP_NAME, disabled, RegistryValueKind.Binary);
-                            Log("Wrote StartupApproved disabled marker");
-                        }
-                        catch (Exception ex)
-                        {
-                            Log("Failed to write StartupApproved disabled marker: " + ex.Message);
-                        }
+                        WriteApprovedMarker(runApprovedKey, APP_NAME, 0x03);
+                        WriteApprovedMarker(folderApprovedKey, STARTUP_SHORTCUT_FILE, 0x03);
+                        Log("Wrote StartupApproved disabled markers");
                     }
                 }
             }
@@ -117,9 +162,9 @@ namespace BearsAdaClock
                     }
                 }
 
-                using (RegistryKey? approvedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
+                using (RegistryKey? runApprovedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_PATH, false))
                 {
-                    var val = approvedKey?.GetValue(APP_NAME) as byte[];
+                    var val = runApprovedKey?.GetValue(APP_NAME) as byte[];
                     if (val != null && val.Length > 0)
                     {
                         // First byte: 0x02 = enabled, 0x03 = disabled
@@ -127,8 +172,18 @@ namespace BearsAdaClock
                     }
                 }
 
-                bool enabled = (hasValidRunEntry && !isDisabledByApproval) || hasShortcut;
-                Log($"IsStartupEnabled => {enabled} hasShortcut={hasShortcut} hasValidRunEntry={hasValidRunEntry} runRaw='{runRaw}' runExe='{runExe}' disabledByApproval={isDisabledByApproval}");
+                bool shortcutDisabledByApproval = false;
+                using (RegistryKey? folderApprovedKey = Registry.CurrentUser.OpenSubKey(STARTUP_APPROVED_STARTUP_FOLDER_PATH, false))
+                {
+                    var val = folderApprovedKey?.GetValue(STARTUP_SHORTCUT_FILE) as byte[];
+                    if (val != null && val.Length > 0)
+                    {
+                        shortcutDisabledByApproval = val[0] == 0x03;
+                    }
+                }
+
+                bool enabled = (hasValidRunEntry && !isDisabledByApproval) || (hasShortcut && !shortcutDisabledByApproval);
+                Log($"IsStartupEnabled => {enabled} hasShortcut={hasShortcut} hasValidRunEntry={hasValidRunEntry} runRaw='{runRaw}' runExe='{runExe}' disabledByApproval={isDisabledByApproval} shortcutDisabled={shortcutDisabledByApproval}");
                 return enabled;
             }
             catch (Exception ex)
@@ -136,6 +191,94 @@ namespace BearsAdaClock
                 Log("IsStartupEnabled error: " + ex.Message);
                 return false;
             }
+        }
+
+        private static bool VerifyRunEntry(string exePath)
+        {
+            try
+            {
+                using (RegistryKey? runKey = Registry.CurrentUser.OpenSubKey(RUN_REGISTRY_PATH, false))
+                {
+                    string? raw = runKey?.GetValue(APP_NAME) as string;
+                    if (string.IsNullOrWhiteSpace(raw)) return false;
+
+                    string token = raw.Trim().Trim('"');
+
+                    // Case 1: points directly at the app exe (legacy form).
+                    if (string.Equals(token, exePath.Trim().Trim('"'), StringComparison.OrdinalIgnoreCase))
+                        return File.Exists(exePath);
+
+                    // Case 2: points at the launcher .cmd (current form).
+                    if (string.Equals(token, GetLauncherPath(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        string launcherPath = GetLauncherPath();
+                        if (!File.Exists(launcherPath)) return false;
+                        try
+                        {
+                            // The launcher references the app exe; a stale reference means
+                            // the entry must be rewritten, so verify the path inside it.
+                            string content = File.ReadAllText(launcherPath);
+                            return content.Contains(exePath, StringComparison.OrdinalIgnoreCase);
+                        }
+                        catch { return false; }
+                    }
+
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("VerifyRunEntry error: " + ex.Message);
+                return false;
+            }
+        }
+
+        private static string GetLauncherPath()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            return Path.Combine(appData, "N6REJ", "BearsAdaClock", LAUNCHER_FILE);
+        }
+
+        private static bool TryWriteLauncher(string exePath, string launcherPath)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(launcherPath)!);
+                string content = "@echo off\r\nstart \"\" \"" + exePath + "\" " + AUTOSTART_ARG + "\r\n";
+                File.WriteAllText(launcherPath, content);
+                return File.Exists(launcherPath);
+            }
+            catch (Exception ex)
+            {
+                Log("Write launcher failed: " + ex.Message);
+                return false;
+            }
+        }
+
+        private static void WriteApprovedMarker(RegistryKey? key, string name, byte state)
+        {
+            try
+            {
+                byte[] marker = new byte[12];
+                marker[0] = state;
+                key?.SetValue(name, marker, RegistryValueKind.Binary);
+            }
+            catch (Exception ex)
+            {
+                Log($"WriteApprovedMarker({name}, {state}) failed: " + ex.Message);
+            }
+        }
+
+        private static void DeleteApprovedMarker(RegistryKey? key, string name)
+        {
+            try
+            {
+                if (key?.GetValue(name) != null)
+                {
+                    key.DeleteValue(name, false);
+                }
+            }
+            catch (Exception ex) { Log("DeleteApprovedMarker failed: " + ex.Message); }
         }
 
         private static string? ExtractExeFromRunValue(string? value)
@@ -159,13 +302,12 @@ namespace BearsAdaClock
         private static string GetStartupShortcutPath()
         {
             string startupFolder = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
-            return Path.Combine(startupFolder, APP_NAME + ".lnk");
+            return Path.Combine(startupFolder, STARTUP_SHORTCUT_FILE);
         }
 
         private static bool TryCreateStartupShortcut(string shortcutPath, string exePath)
         {
-            // Note: This method is now legacy and kept for potential future use or manual calls.
-            // SetStartup now prioritizes HKCU\Run.
+            // Legacy fallback mechanism (used only if the HKCU\Run entry cannot be verified).
             try { Directory.CreateDirectory(Path.GetDirectoryName(shortcutPath)!); } catch (Exception ex) { Log("CreateDirectory failed: " + ex.Message); }
 
             // Try robust ShellLink COM first (works even if Windows Script Host is disabled)
@@ -173,7 +315,7 @@ namespace BearsAdaClock
             {
                 var link = (IShellLinkW)new CShellLink();
                 link.SetPath(exePath);
-                link.SetWorkingDirectory(Path.GetDirectoryName(exePath));
+                link.SetWorkingDirectory(Path.GetDirectoryName(exePath) ?? string.Empty);
                 link.SetShowCmd(1); // SW_SHOWNORMAL
                 link.SetDescription("Bears ADA Clock");
                 link.SetIconLocation(exePath, 0);
@@ -237,52 +379,48 @@ namespace BearsAdaClock
         {
             try
             {
-                // First try to get the main module file name (works for both single-file and regular deployments)
-                string? processPath = Process.GetCurrentProcess().MainModule?.FileName;
-                if (!string.IsNullOrEmpty(processPath) && File.Exists(processPath) && processPath.EndsWith(".exe"))
-                    return processPath;
-                
-                // For single-file apps, use AppContext.BaseDirectory
-                string baseDirectory = AppContext.BaseDirectory;
-                string exePath = Path.Combine(baseDirectory, "BearsAdaClock.exe");
-                if (File.Exists(exePath))
-                    return exePath;
-                
-                // Fallback to assembly location (for non-single-file deployments)
-                string? assemblyPath = null;
+                // Prefer Environment.ProcessPath - it returns the real apphost/bundle
+                // executable path even for single-file (self-contained single exe) builds.
+                string? processPath = Environment.ProcessPath;
+                if (IsValidExe(processPath))
+                    return processPath!;
+
+                // Fall back to the main module file name.
                 try
                 {
-                    assemblyPath = null; // Don't use Assembly.Location in single-file apps
+                    string? mainModule = Process.GetCurrentProcess().MainModule?.FileName;
+                    if (IsValidExe(mainModule))
+                        return mainModule!;
                 }
                 catch { }
 
-                if (!string.IsNullOrEmpty(assemblyPath))
+                // Last resort: build the path from AppContext.BaseDirectory.
+                // NOTE: for single-file apps this is the temp extraction dir which is
+                // deleted on reboot - reject candidates that live under the temp path.
+                string baseDirectory = AppContext.BaseDirectory;
+                string tempPath = Path.GetTempPath();
+                if (!string.IsNullOrEmpty(baseDirectory) &&
+                    !baseDirectory.StartsWith(tempPath, StringComparison.OrdinalIgnoreCase))
                 {
-                    if (assemblyPath.EndsWith(".dll"))
-                    {
-                        string dllExePath = Path.ChangeExtension(assemblyPath, ".exe");
-                        if (File.Exists(dllExePath)) return dllExePath;
-                        string? directory = Path.GetDirectoryName(assemblyPath);
-                        if (directory != null)
-                        {
-                            string assemblyName = Path.GetFileNameWithoutExtension(assemblyPath);
-                            string potentialExePath = Path.Combine(directory, assemblyName + ".exe");
-                            if (File.Exists(potentialExePath)) return potentialExePath;
-                            string clockExePath = Path.Combine(directory, "BearsAdaClock.exe");
-                            if (File.Exists(clockExePath)) return clockExePath;
-                        }
-                    }
-                    return assemblyPath;
+                    string candidate = Path.Combine(baseDirectory, "BearsAdaClock.exe");
+                    if (File.Exists(candidate))
+                        return candidate;
                 }
-                
-                // Final fallback - use the process path or base directory
+
                 return processPath ?? baseDirectory;
             }
             catch (Exception ex)
-            { 
+            {
                 Log("GetExecutablePath error: " + ex.Message);
-                return AppContext.BaseDirectory; 
+                return AppContext.BaseDirectory;
             }
+        }
+
+        private static bool IsValidExe(string? path)
+        {
+            return !string.IsNullOrEmpty(path)
+                && path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                && File.Exists(path);
         }
 
         private static void Log(string message)
@@ -297,10 +435,9 @@ namespace BearsAdaClock
             }
             catch { }
         }
-#nullable restore
 
-        // Clean up unneeded COM types if no longer used by SetStartup
-        #region COM Interop for Shell Link (Legacy)
+        // COM Interop for Shell Link (legacy Startup-folder shortcut fallback)
+        #region COM Interop for Shell Link
         [ComImport]
         [Guid("000214F9-0000-0000-C000-000000000046")]
         [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
