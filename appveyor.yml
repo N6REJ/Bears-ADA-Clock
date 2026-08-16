@@ -9,20 +9,17 @@ image: Visual Studio 2022
 
 # The .vdproj cannot be built by MSBuild, so the default solution build is disabled
 # and everything is done explicitly below.
+# NOTE: the "Visual Studio Installer Projects" extension is already preinstalled on
+# the "Visual Studio 2022" image, so no install step is needed (the AppVeyor
+# setup.exe modify step used to fail with an empty exit code - see appveyor/ci #1773).
 build: off
-
-install:
-  - ps: 'dotnet --version'
-  # Add the "Visual Studio Installer Projects" component so .vdproj can be built.
-  # --wait makes setup.exe block until the operation completes (it is a bootstrapper
-  # that otherwise returns immediately), and Start-Process captures its real exit code.
-  - ps: 'Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList "modify","--installPath","C:\Program Files\Microsoft Visual Studio\2022\Community","--add","Microsoft.VisualStudio.Component.InstallerProjects","--quiet","--norestart","--wait" -Wait -PassThru | ForEach-Object { if ($_.ExitCode -ne 0 -and $_.ExitCode -ne 3010) { throw "VS Installer Projects setup failed: $($_.ExitCode)" } }'
 
 build_script:
   # 1) Publish the app. The .vdproj packages this publish output.
   - ps: 'dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true; if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }'
   # 2) Allow .vdproj builds outside the Visual Studio IDE (required on CI).
-  - cmd: 'cd /d "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\VSI\DisableOutOfProcBuild" && DisableOutOfProcBuild.exe'
+  #    Guarded: the extension is preinstalled on the image, but skip if the tool is absent.
+  - ps: '$disableOutOfProc = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\VSI\DisableOutOfProcBuild\DisableOutOfProcBuild.exe"; if (Test-Path $disableOutOfProc) { & $disableOutOfProc; if ($LASTEXITCODE -ne 0) { throw "DisableOutOfProcBuild failed: $LASTEXITCODE" } } else { Write-Host "DisableOutOfProcBuild.exe not found - skipping" }'
   # 3) Build the MSI with devenv (the only tool that supports .vdproj).
   - ps: '& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.com" "BearsAdaClock.sln" /Build "Release" /Project "Installer\Installer.vdproj"; if ($LASTEXITCODE -ne 0) { throw "devenv failed: $LASTEXITCODE" }'
   # 4) Log the produced MSI.
