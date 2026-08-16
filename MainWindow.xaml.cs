@@ -39,8 +39,7 @@ namespace BearsAdaClock
             this.Loaded += MainWindow_Loaded;
             this.ContentRendered += (s, e) => Logger.Info($"MainWindow ContentRendered - Bounds L={this.Left:F0} T={this.Top:F0} W={this.ActualWidth:F0} H={this.ActualHeight:F0}, Visible={this.IsVisible}");
             InitializeStartupSetting();
-            bool launchedByWindowsStartup = Array.IndexOf(Environment.GetCommandLineArgs(), "--autostart") >= 0;
-            Logger.Info($"MainWindow constructor - end (launchedByWindowsStartup={launchedByWindowsStartup})");
+            Logger.Info("MainWindow constructor - end");
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -443,18 +442,11 @@ namespace BearsAdaClock
                 bool registryStartupEnabled = RegistryHelper.IsStartupEnabled();
                 Logger.Info($"SynchronizeStartupSetting - registry={registryStartupEnabled}, settings={settingsStartupEnabled}");
 
-                if (settingsStartupEnabled)
+                // Update registry to match settings if they differ
+                if (settingsStartupEnabled != registryStartupEnabled)
                 {
-                    // HKCU\Run is the primary startup mechanism and is (re)registered
-                    // automatically on every launch so startup always works, even if a
-                    // previous entry was removed or points at a stale location.
-                    RegistryHelper.SetStartup(true);
-                    Logger.Info("SynchronizeStartupSetting - HKCU Run entry ensured.");
-                }
-                else if (registryStartupEnabled)
-                {
-                    RegistryHelper.SetStartup(false);
-                    Logger.Info("SynchronizeStartupSetting - Removed startup entries to match disabled setting.");
+                    RegistryHelper.SetStartup(settingsStartupEnabled);
+                    Logger.Info($"SynchronizeStartupSetting - Synced registry to {settingsStartupEnabled} per settings.");
                 }
             }
             catch (Exception ex)
