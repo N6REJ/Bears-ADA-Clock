@@ -14,7 +14,9 @@ build: off
 install:
   - ps: 'dotnet --version'
   # Add the "Visual Studio Installer Projects" component so .vdproj can be built.
-  - ps: '& "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Community" --add Microsoft.VisualStudio.Component.InstallerProjects --quiet --norestart; if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { throw "VS Installer Projects setup failed: $LASTEXITCODE" }'
+  # --wait makes setup.exe block until the operation completes (it is a bootstrapper
+  # that otherwise returns immediately), and Start-Process captures its real exit code.
+  - ps: 'Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList "modify","--installPath","C:\Program Files\Microsoft Visual Studio\2022\Community","--add","Microsoft.VisualStudio.Component.InstallerProjects","--quiet","--norestart","--wait" -Wait -PassThru | ForEach-Object { if ($_.ExitCode -ne 0 -and $_.ExitCode -ne 3010) { throw "VS Installer Projects setup failed: $($_.ExitCode)" } }'
 
 build_script:
   # 1) Publish the app. The .vdproj packages this publish output.
