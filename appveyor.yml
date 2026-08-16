@@ -1,0 +1,44 @@
+# AppVeyor configuration for Bears ADA Clock
+# 1) Publish the app (self-contained single-file)
+# 2) Build the MSI from the Visual Studio Installer project (.vdproj)
+# 3) Upload the MSI as a build artifact; auto-publish to GitHub Releases on tags
+
+version: 26.08.16.{build}
+
+image: Visual Studio 2022
+
+# The .vdproj cannot be built by MSBuild, so the default solution build is disabled
+# and everything is done explicitly below.
+build: off
+
+install:
+  - ps: 'dotnet --version'
+  # Add the "Visual Studio Installer Projects" component so .vdproj can be built.
+  - ps: '& "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Community" --add Microsoft.VisualStudio.Component.InstallerProjects --quiet --norestart; if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 3010) { throw "VS Installer Projects setup failed: $LASTEXITCODE" }'
+
+build_script:
+  # 1) Publish the app. The .vdproj packages this publish output.
+  - ps: 'dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true; if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }'
+  # 2) Allow .vdproj builds outside the Visual Studio IDE (required on CI).
+  - cmd: 'cd /d "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\VSI\DisableOutOfProcBuild" && DisableOutOfProcBuild.exe'
+  # 3) Build the MSI with devenv (the only tool that supports .vdproj).
+  - ps: '& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.com" "BearsAdaClock.sln" /Build "Release" /Project "Installer\Installer.vdproj"; if ($LASTEXITCODE -ne 0) { throw "devenv failed: $LASTEXITCODE" }'
+  # 4) Log the produced MSI.
+  - ps: 'Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize'
+
+artifacts:
+  - path: 'Installer\**\Bears ADA Clock Installer.msi'
+    name: BearsADA Clock Installer (MSI)
+  - path: 'Installer\**\setup.exe'
+    name: BearsADA Clock Installer (setup.exe)
+
+# On tag push, publish the MSI and bootstrapper to a GitHub Release.
+# NOTE: set an encrypted environment variable named GITHUB_TOKEN
+# (a repo token with "contents: write" scope) in AppVeyor project settings.
+deploy:
+  - provider: GitHub
+    auth_token: $(GITHUB_TOKEN)
+    description: 'Automated build of Bears ADA Clock'
+    artifact: BearsADA Clock Installer (MSI), BearsADA Clock Installer (setup.exe)
+    on:
+      APPVEYOR_REPO_TAG: true
