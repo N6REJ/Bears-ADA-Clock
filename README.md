@@ -5,6 +5,9 @@
 
 # Bears ADA Clock
 
+[![Version](https://img.shields.io/badge/Version-26.08.16-blue)](https://github.com/N6REJ/Bears-ADA-Clock/releases)
+[![AppVeyor Build](https://img.shields.io/appveyor/build/N6REJ/bears-ada-clock)](https://ci.appveyor.com/project/N6REJ/bears-ada-clock)
+
 A desktop clock specifically designed for those with accessibility issues, featuring full screen reader support and comprehensive customization options.
 
 ## Features
