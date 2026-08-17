@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <Product Id="*"
+           Name="Bears ADA Clock"
+           Language="1033"
+           Version="26.8.16"
+           Manufacturer="N6REJ"
+           UpgradeCode="136C055A-A08C-47B3-8359-6923C8D6D20F">
+
+    <Package InstallerVersion="200"
+             Compressed="yes"
+             InstallScope="perUser"
+             Description="Bears ADA Clock Installer"
+             Comments="Accessibility Friendly Desktop Clock" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="AppIcon" SourceFile="$(var.SourceDir)\icons\clock.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/N6REJ/Bears-ADA-Clock" />
+    <Property Id="ARPURLINFOABOUT" Value="https://hallhome.us/software" />
+    <Property Id="ARPCOMMENTS" Value="Accessibility Friendly Desktop Clock" />
+    <Property Id="ARPCONTACT" Value="Troy Hall" />
+    <Property Id="ARPNOREPAIR" Value="yes" Secure="yes" />
+
+    <Property Id="USERDESKTOP">
+      <RegistrySearch Id="FindDesktop" Root="HKCU"
+                      Key="Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+                      Name="Desktop" Type="raw" />
+    </Property>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ManufacturerFolder" Name="N6REJ">
+          <Directory Id="INSTALLFOLDER" Name="Bears ADA Clock" />
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ProgramMenuN6REJ" Name="N6REJ" />
+      </Directory>
+      <Directory Id="DesktopFolder" />
+    </Directory>
+
+    <CustomAction Id="SetDesktopFolder" Property="DesktopFolder" Value="[USERDESKTOP]" />
+
+    <InstallExecuteSequence>
+      <Custom Action="SetDesktopFolder" After="AppSearch" />
+    </InstallExecuteSequence>
+
+    <Feature Id="Complete" Title="Bears ADA Clock" Level="1">
+      <ComponentRef Id="MainExe" />
+      <ComponentRef Id="ClockIcon" />
+      <ComponentRef Id="ClockImage" />
+      <ComponentRef Id="FontFile" />
+      <ComponentRef Id="RemoveManufacturerFolder" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="MainExe" Guid="B1A2C3D4-1111-2222-3333-AABBCCDDEEFF">
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="MainExeInstalled" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="MainExe" Source="$(var.PublishDir)\BearsAdaClock.exe" />
+        <RemoveFile Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" Name="*.*" />
+      </Component>
+      <Component Id="ClockIcon" Guid="B1A2C3D4-1111-2222-3333-AABBCCDDEEF0">
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="ClockIconInstalled" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="ClockIcon" Source="$(var.SourceDir)\icons\clock.ico" />
+      </Component>
+      <Component Id="ClockImage" Guid="B1A2C3D4-1111-2222-3333-AABBCCDDEEF1">
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="ClockImageInstalled" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="ClockImage" Source="$(var.SourceDir)\icons\clock.png" />
+      </Component>
+      <Component Id="FontFile" Guid="B1A2C3D4-1111-2222-3333-AABBCCDDEEF2">
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="FontFileInstalled" Type="integer" Value="1" KeyPath="yes" />
+        <File Id="FontFile" Source="$(var.SourceDir)\Fonts\RobotoMono-Regular.ttf" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ManufacturerFolder">
+      <Component Id="RemoveManufacturerFolder" Guid="B1A2C3D4-1111-2222-3333-AABBCCDDEEF3">
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="RemoveFolderKey" Type="integer" Value="1" KeyPath="yes" />
+        <RemoveFile Id="RemoveMfrFolder" Directory="ManufacturerFolder" On="uninstall" Name="*.*" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="B1A2C3D4-1111-2222-3333-AABBCCDDEEF5">
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="desktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+        <Shortcut Id="DesktopShortcut"
+                  Name="Bears ADA Clock"
+                  Target="[INSTALLFOLDER]BearsAdaClock.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ProgramMenuN6REJ">
+      <Component Id="StartMenuShortcut" Guid="*">
+        <Shortcut Id="StartMenuShortcut"
+                  Name="Bears ADA Clock"
+                  Target="[INSTALLFOLDER]BearsAdaClock.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="AppIcon" />
+        <RemoveFolder Id="ProgramMenuN6REJ_Remove" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\N6REJ\Bears ADA Clock"
+                       Name="startMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <UIRef Id="WixUI_Minimal" />
+
+  </Product>
+
+</Wix>

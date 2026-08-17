@@ -7,13 +7,17 @@ obj/
 *.docstates
 
 # MSI Installer Outputs
-Installer/
+Installer/bin/
+Installer/obj/
+Installer/*.msi
+Installer/*.wixpdb
+Installer/*.log
+Installer/setup.exe
 MSI_Output/
 MSI_Framework/
 *Setup/Debug/
 *Setup/Release/
 *.msi
-*.exe
 *.cab
 
 # Visual Studio

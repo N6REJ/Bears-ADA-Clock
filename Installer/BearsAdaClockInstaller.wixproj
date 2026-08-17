@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProductVersion>3.10</ProductVersion>
+    <ProjectGuid>{3C4E5F6A-7B8C-9D0E-F1A2-3B4C5D6E7F80}</ProjectGuid>
+    <SchemaVersion>2.0</SchemaVersion>
+    <InstallerVersion>200</InstallerVersion>
+    <Compressed>le</Compressed>
+    <InstallScope>perUser</InstallScope>
+    <OutputName>Bears ADA Clock Installer</OutputName>
+    <OutputType>Package</OutputType>
+    <DefineSolutionProperties>false</DefineSolutionProperties>
+    <OutputPath>bin\$(Platform)\$(Configuration)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <SourceDir>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '..'))</SourceDir>
+    <PublishDir Condition=" '$(PublishDir)' == '' ">$([MSBuild]::NormalizePath('$(SourceDir)', 'bin', 'Release', 'net8.0-windows', 'win-x64', 'publish'))</PublishDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND Exists('$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\wix.targets')">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\wix.targets</WixTargetsPath>
+    <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND Exists('C:\Program Files (x86)\MSBuild\Microsoft\WiX\v3.x\wix.targets')">C:\Program Files (x86)\MSBuild\Microsoft\WiX\v3.x\wix.targets</WixTargetsPath>
+    <WixInstallDir>$(MSBuildProgramFiles32)\WiX Toolset v3.14\</WixInstallDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <WixExtension Include="WixUIExtension">
+      <HintPath>$(WixInstallDir)bin\WixUIExtension.dll</HintPath>
+      <Name>WixUIExtension</Name>
+    </WixExtension>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <DefineConstants>PublishDir=$(PublishDir);SourceDir=$(SourceDir)</DefineConstants>
+    <SuppressIces>ICE64</SuppressIces>
+  </PropertyGroup>
+
+  <Import Project="$(WixTargetsPath)" />
+
+</Project>
