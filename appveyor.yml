@@ -20,7 +20,7 @@ build_script:
       & $msbuild $wixProj /p:Configuration=Release /p:Platform=x64 /v:minimal
       if ($LASTEXITCODE -ne 0) { throw "WiX build failed: $LASTEXITCODE" }
   # 3) Log the produced MSI.
-  - Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize
+  - ps: Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize
 
 artifacts:
   - path: 'Installer\**\*.msi'
