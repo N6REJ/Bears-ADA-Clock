@@ -1,7 +1,7 @@
 # AppVeyor configuration for Bears ADA Clock
 # 1) Publish the app (self-contained single-file)
 # 2) Build the MSI with WiX via MSBuild
-# 3) Upload the MSI as a build artifact; auto-publish to GitHub Releases on tags
+# 3) Auto-tag, create GitHub Release, and upload MSI — all in one build
 
 version: 26.08.16.{build}
 
@@ -26,25 +26,45 @@ artifacts:
   - path: 'Installer\**\*.msi'
     name: BearsADA Clock Installer (MSI)
 
-# On tag push, publish the MSI to a GitHub Release.
+# On successful build: create tag, push it, create GitHub Release, upload MSI — all in one step.
 # NOTE: set an encrypted environment variable named GH_PAT
 # (a repo token with "contents: write" scope) in AppVeyor project settings.
-deploy:
-  - provider: GitHub
-    auth_token: $(GH_PAT)
-    description: 'Automated build of Bears ADA Clock'
-    artifact: BearsADA Clock Installer (MSI)
-    on:
-      APPVEYOR_REPO_TAG: true
-
-# Auto-create a tag on successful commit builds (not tag-triggered builds).
 on_success:
   - ps: |
       if ($env:APPVEYOR_REPO_TAG -ne "true") {
         $tag = "{0}.{1}" -f (Get-Date -Format "yyyy.MM.dd"), $env:APPVEYOR_BUILD_NUMBER
+        $repo = $env:APPVEYOR_REPO_NAME
+        $token = $env:GH_PAT
+
+        # Create and push tag
         git config user.email "ci@appveyor.com"
         git config user.name "AppVeyor"
         git tag $tag
-        $repoUrl = $env:APPVEYOR_REPO_NAME
-        git push "https://${env:GH_PAT}@github.com/${repoUrl}.git" $tag
+        git push "https://${token}@github.com/${repo}.git" $tag
+
+        # Create GitHub Release
+        $releaseBody = @{
+          tag_name = $tag
+          name = "Bears ADA Clock $tag"
+          body = "Automated build of Bears ADA Clock"
+          draft = $false
+          prerelease = $false
+        } | ConvertTo-Json
+
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases" `
+          -Method Post `
+          -Headers @{ Authorization = "token $token"; Accept = "application/vnd.github.v3+json" } `
+          -Body $releaseBody
+
+        # Upload MSI to the release
+        $msi = Get-ChildItem -Path "Installer" -Recurse -Filter "*.msi" | Select-Object -First 1
+        $uploadUrl = "https://uploads.github.com/repos/$repo/releases/$($release.id)/assets?name=$($msi.Name)"
+
+        Invoke-RestMethod -Uri $uploadUrl `
+          -Method Post `
+          -Headers @{ Authorization = "token $token"; Accept = "application/vnd.github.v3+json" } `
+          -ContentType "application/octet-stream" `
+          -InFile $msi.FullName
+
+        Write-Host "Released $tag with $($msi.Name)"
       }
