@@ -10,6 +10,12 @@ image: Visual Studio 2026
 build: off
 
 build_script:
+  # 0) Ensure .NET 8 SDK is available (VS 2026 image ships .NET 10 only).
+  - ps: |
+      $installScript = "$env:TEMP\dotnet-install.ps1"
+      Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installScript -UseBasicParsing
+      & $installScript -Channel 8.0 -Quality ga
+      & dotnet --list-sdks
   # 1) Publish the app. The .vdproj packages this publish output.
   - ps: 'dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true; if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }'
   # 2) Disable out-of-process builds for devenv (prevents the 8000000A validation error).
