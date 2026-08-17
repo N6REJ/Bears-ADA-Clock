@@ -36,3 +36,14 @@ deploy:
     artifact: BearsADA Clock Installer (MSI)
     on:
       APPVEYOR_REPO_TAG: true
+
+# Auto-create a tag on successful commit builds (not tag-triggered builds).
+on_success:
+  - ps: |
+      if ($env:APPVEYOR_REPO_TAG -ne "true") {
+        $tag = "{0}.{1}" -f (Get-Date -Format "yyyy.MM.dd"), $env:APPVEYOR_BUILD_NUMBER
+        git config user.email "ci@appveyor.com"
+        git config user.name "AppVeyor"
+        git tag $tag
+        git push origin $tag
+      }
