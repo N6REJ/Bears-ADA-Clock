@@ -1,60 +1,38 @@
 # AppVeyor configuration for Bears ADA Clock
 # 1) Publish the app (self-contained single-file)
-# 2) Build the MSI from the Visual Studio Installer project (.vdproj)
+# 2) Build the MSI with WiX via MSBuild
 # 3) Upload the MSI as a build artifact; auto-publish to GitHub Releases on tags
 
 version: 26.08.16.{build}
 
-image: Visual Studio 2026
+image: Visual Studio 2022
 
 build: off
 
 build_script:
-  # 0) Ensure .NET 8 SDK is available (VS 2026 image ships .NET 10 only).
-  - ps: |
-      $installScript = "$env:TEMP\dotnet-install.ps1"
-      Invoke-WebRequest -Uri 'https://dot.net/v1/dotnet-install.ps1' -OutFile $installScript -UseBasicParsing
-      & $installScript -Channel 8.0 -Quality ga
-      & dotnet --list-sdks
-  # 1) Publish the app. The .vdproj packages this publish output.
-  - ps: 'dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true; if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }'
-  # 2) Disable out-of-process builds for devenv (prevents the 8000000A validation error).
+  # 1) Publish the app (single-file self-contained EXE).
+  - dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true
+  # 2) Build the MSI with WiX via MSBuild.
   - ps: |
       $vsPath = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property installationPath
-      $devenvCom = Join-Path $vsPath 'Common7\IDE\devenv.com'
-      # Set the registry key to disable out-of-process build for the VS instance.
-      $vsVersion = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property catalog_productLineVersion
-      $instanceId = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property instanceId
-      $regPath = "HKCU:\Software\Microsoft\VisualStudio\${vsVersion}_${instanceId}_Config\MSBuild"
-      if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-      Set-ItemProperty -Path $regPath -Name 'EnableOutOfProcBuild' -Value 0 -Type DWord
-      Write-Host "Set EnableOutOfProcBuild=0 at $regPath"
-  # 3) Build the MSI with devenv (the only tool that supports .vdproj).
-  #    IMPORTANT: VS2022 devenv does NOT support relative paths — use absolute paths.
-  - ps: |
-      $vsPath = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property installationPath
-      $devenvCom = Join-Path $vsPath 'Common7\IDE\devenv.com'
-      $sln = Join-Path $env:APPVEYOR_BUILD_FOLDER 'BearsAdaClock.sln'
-      $vdproj = Join-Path $env:APPVEYOR_BUILD_FOLDER 'Installer\Installer.vdproj'
-      Write-Host "Building with: $devenvCom"
-      & $devenvCom $sln /Build "Release|Any CPU" /Project $vdproj
-      if ($LASTEXITCODE -ne 0) { throw "devenv failed: $LASTEXITCODE" }
-  # 4) Log the produced MSI.
-  - ps: 'Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize'
+      $msbuild = Join-Path $vsPath 'MSBuild\Current\Bin\MSBuild.exe'
+      $wixProj = Join-Path $env:APPVEYOR_BUILD_FOLDER 'Installer\BearsAdaClockInstaller.wixproj'
+      & $msbuild $wixProj /p:Configuration=Release /p:Platform=x64 /v:minimal
+      if ($LASTEXITCODE -ne 0) { throw "WiX build failed: $LASTEXITCODE" }
+  # 3) Log the produced MSI.
+  - Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize
 
 artifacts:
-  - path: 'Installer\**\Bears ADA Clock Installer.msi'
+  - path: 'Installer\**\*.msi'
     name: BearsADA Clock Installer (MSI)
-  - path: 'Installer\**\setup.exe'
-    name: BearsADA Clock Installer (setup.exe)
 
-# On tag push, publish the MSI and bootstrapper to a GitHub Release.
-# NOTE: set an encrypted environment variable named GITHUB_TOKEN
+# On tag push, publish the MSI to a GitHub Release.
+# NOTE: set an encrypted environment variable named GH_PAT
 # (a repo token with "contents: write" scope) in AppVeyor project settings.
 deploy:
   - provider: GitHub
     auth_token: $(GH_PAT)
     description: 'Automated build of Bears ADA Clock'
-    artifact: BearsADA Clock Installer (MSI), BearsADA Clock Installer (setup.exe)
+    artifact: BearsADA Clock Installer (MSI)
     on:
       APPVEYOR_REPO_TAG: true
