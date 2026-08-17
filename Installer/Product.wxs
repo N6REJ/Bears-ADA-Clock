@@ -18,6 +18,8 @@
 
     <MediaTemplate EmbedCab="yes" />
 
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
     <Icon Id="AppIcon" SourceFile="$(var.SourceDir)\icons\clock.ico" />
     <Property Id="ARPPRODUCTICON" Value="AppIcon" />
     <Property Id="ARPHELPLINK" Value="https://github.com/N6REJ/Bears-ADA-Clock" />
