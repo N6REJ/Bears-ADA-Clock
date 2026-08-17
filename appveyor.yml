@@ -9,22 +9,47 @@ image: Visual Studio 2022
 
 # The .vdproj cannot be built by MSBuild, so the default solution build is disabled
 # and everything is done explicitly below.
-# NOTE: the "Visual Studio Installer Projects" extension is already preinstalled on
-# the "Visual Studio 2022" image, so no install step is needed (the AppVeyor
-# setup.exe modify step used to fail with an empty exit code - see appveyor/ci #1773).
 build: off
+
+install:
+  # Install the "Visual Studio Installer Projects" extension via VSIX.
+  # The extension may not be registered on the current image, so install explicitly.
+  - ps: |
+      $vsixUrl = 'https://marketplace.visualstudio.com/_apis/public/gallery/publishers/VisualStudioClient/vsextensions/MicrosoftVisualStudio2022InstallerProjects/latest/vspackage'
+      $vsixPath = "$env:USERPROFILE\InstallerProjects.vsix"
+      Write-Host "Downloading VSIX..."
+      Invoke-WebRequest $vsixUrl -OutFile $vsixPath -UseBasicParsing
+      $vsPath = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property installationPath
+      $vsixInstaller = Join-Path $vsPath 'Common7\IDE\VSIXInstaller.exe'
+      Write-Host "Installing VSIX to: $vsPath"
+      $proc = Start-Process -FilePath $vsixInstaller -Wait -PassThru -ArgumentList '/q', '/a', "`"$vsixPath`""
+      Write-Host "VSIX install done. Exit code: $($proc.ExitCode)"
 
 build_script:
   # 1) Publish the app. The .vdproj packages this publish output.
   - ps: 'dotnet publish "BearsAdaClock.csproj" -c Release -r win-x64 --self-contained true; if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed" }'
-  # 2) Build the MSI with devenv (the only tool that supports .vdproj).
+  # 2) Disable out-of-process builds for devenv (prevents the 8000000A validation error).
+  - ps: |
+      $vsPath = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property installationPath
+      $devenvCom = Join-Path $vsPath 'Common7\IDE\devenv.com'
+      # Set the registry key to disable out-of-process build for the VS instance.
+      $vsVersion = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property catalog_productLineVersion
+      $instanceId = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property instanceId
+      $regPath = "HKCU:\Software\Microsoft\VisualStudio\${vsVersion}_${instanceId}_Config\MSBuild"
+      if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+      Set-ItemProperty -Path $regPath -Name 'EnableOutOfProcBuild' -Value 0 -Type DWord
+      Write-Host "Set EnableOutOfProcBuild=0 at $regPath"
+  # 3) Build the MSI with devenv (the only tool that supports .vdproj).
   #    IMPORTANT: VS2022 devenv does NOT support relative paths — use absolute paths.
   - ps: |
+      $vsPath = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -property installationPath
+      $devenvCom = Join-Path $vsPath 'Common7\IDE\devenv.com'
       $sln = Join-Path $env:APPVEYOR_BUILD_FOLDER 'BearsAdaClock.sln'
       $vdproj = Join-Path $env:APPVEYOR_BUILD_FOLDER 'Installer\Installer.vdproj'
-      & "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.com" $sln /Build "Release|Any CPU" /Project $vdproj
+      Write-Host "Building with: $devenvCom"
+      & $devenvCom $sln /Build "Release|Any CPU" /Project $vdproj
       if ($LASTEXITCODE -ne 0) { throw "devenv failed: $LASTEXITCODE" }
-  # 3) Log the produced MSI.
+  # 4) Log the produced MSI.
   - ps: 'Get-ChildItem -Path "Installer" -Recurse -Filter *.msi | Select-Object FullName,Length | Format-Table -AutoSize'
 
 artifacts:
