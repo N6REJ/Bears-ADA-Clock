@@ -3,7 +3,7 @@
   "owner": "N6REJ",
   "repo": "Bears-ADA-Clock",
   "visibility": "public",
-  "generatedAt": "2026-10-16T10:33:55.940Z",
+  "generatedAt": "2026-10-17T10:03:17.396Z",
   "stats": {
     "total": 13,
     "day": 0,
@@ -12,14 +12,14 @@
   },
   "partial": {
     "day": false,
-    "week": true,
+    "week": false,
     "month": true
   },
   "snapshots": {
     "windowDays": 180,
-    "count": 7,
+    "count": 8,
     "firstDate": "2026-10-10",
-    "lastDate": "2026-10-16",
+    "lastDate": "2026-10-17",
     "series": {
       "2026-10-10": 13,
       "2026-10-11": 13,
@@ -27,7 +27,8 @@
       "2026-10-13": 13,
       "2026-10-14": 13,
       "2026-10-15": 13,
-      "2026-10-16": 13
+      "2026-10-16": 13,
+      "2026-10-17": 13
     }
   },
   "profile": {
